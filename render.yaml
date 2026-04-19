@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: exercise-tracker
+    runtime: python
+    buildCommand: pip install uv && uv sync
+    startCommand: uv run gunicorn app:app --bind 0.0.0.0:$PORT
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: TIMELINE_PASSWORD
+        sync: false
+      - key: SECRET_KEY
+        generateValue: true
+      - key: PYTHON_VERSION
+        value: "3.13.0"

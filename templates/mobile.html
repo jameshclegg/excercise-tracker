@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Exercise Tracker</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+               background: #1a1a2e; color: #e0e0e0; padding: 16px;
+               max-width: 480px; margin: 0 auto; }
+        a { color: #00d4ff; text-decoration: none; }
+        h1 { color: #00d4ff; font-size: 1.3rem; margin-bottom: 1rem; text-align: center; }
+        .top-bar { display: flex; justify-content: space-between; margin-bottom: 0.5rem;
+                   font-size: 0.85rem; }
+
+        /* Date nav */
+        .date-nav { display: flex; gap: 8px; margin-bottom: 1rem; }
+        .date-nav input[type="date"] { flex: 1; padding: 10px; border: 1px solid #333;
+            border-radius: 8px; background: #0f3460; color: #fff; font-size: 1rem; }
+        .date-nav button { padding: 10px 16px; background: #00d4ff; color: #1a1a2e;
+            border: none; border-radius: 8px; font-weight: 600; }
+
+        /* Add form */
+        .add-form { background: #16213e; padding: 1rem; border-radius: 12px;
+                    margin-bottom: 1rem; }
+        .add-form h2 { color: #00d4ff; margin-bottom: 0.8rem; font-size: 1rem; }
+        .form-group { margin-bottom: 0.6rem; }
+        .form-group label { font-size: 0.8rem; color: #888; display: block; margin-bottom: 3px; }
+        .form-group select, .form-group input {
+            width: 100%; padding: 10px; border: 1px solid #333; border-radius: 8px;
+            background: #0f3460; color: #fff; font-size: 1rem; }
+        .num-row { display: flex; gap: 8px; }
+        .num-row .form-group { flex: 1; }
+        .add-btn { width: 100%; padding: 12px; background: #00d4ff; color: #1a1a2e;
+                   border: none; border-radius: 8px; font-weight: 600; font-size: 1rem;
+                   cursor: pointer; margin-top: 0.5rem; }
+
+        /* Entries */
+        .entries { background: #16213e; border-radius: 12px; padding: 1rem; }
+        .entries h2 { color: #00d4ff; margin-bottom: 0.8rem; font-size: 1rem; }
+        .entry-card { background: #0f3460; border-radius: 8px; padding: 10px 12px;
+                      margin-bottom: 8px; display: flex; justify-content: space-between;
+                      align-items: center; }
+        .entry-info { flex: 1; }
+        .entry-name { font-weight: 600; font-size: 0.95rem; }
+        .entry-values { font-size: 0.85rem; color: #aaa; margin-top: 2px; }
+        .entry-notes { font-size: 0.8rem; color: #666; font-style: italic; margin-top: 2px; }
+        .cat-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+                   margin-right: 6px; vertical-align: middle; }
+        .cat-strength { background: #e74c3c; }
+        .cat-isometric { background: #f39c12; }
+        .cat-skill { background: #9b59b6; }
+        .cat-fitness { background: #2ecc71; }
+        .cat-flexibility { background: #3498db; }
+        .delete-btn { background: #e74c3c; color: white; border: none; border-radius: 6px;
+                      padding: 6px 12px; font-size: 0.8rem; cursor: pointer; }
+        .dropdown-item { padding: 10px 12px; cursor: pointer; }
+        .dropdown-item:hover, .dropdown-item.active { background: #16213e; }
+        .dropdown-item .code { font-weight: 700; color: #00d4ff; }
+        .dropdown-item .cat { font-size: 0.75rem; color: #888; margin-left: 8px; }
+        .empty { color: #666; text-align: center; padding: 1.5rem; }
+    </style>
+</head>
+<body>
+    <div class="top-bar">
+        <a href="/?date={{ selected_date }}">🖥 Desktop</a>
+        <a href="/logout">Logout</a>
+    </div>
+    <h1>🏋️ Exercise Tracker</h1>
+
+    <form method="GET" class="date-nav">
+        <input type="date" name="date" value="{{ selected_date }}">
+        <button type="submit">Go</button>
+    </form>
+    <div style="margin-bottom:1rem; text-align:center;">
+        <a href="/m?date={{ next_date }}" style="display:inline-block; padding:10px 24px; background:#0f3460; border-radius:8px; font-weight:600; color:#00d4ff;">+1 Day</a>
+    </div>
+
+    <div class="add-form">
+        <h2>Add Exercise</h2>
+        <form method="POST" action="/add" id="addForm">
+            <input type="hidden" name="date" value="{{ selected_date }}">
+            <input type="hidden" name="redirect" value="/m">
+            <div class="form-group" style="position:relative;">
+                <label>Exercise (type code)</label>
+                <input type="text" id="codeInput" autocomplete="off" placeholder="e.g. P, SQ...">
+                <input type="hidden" name="exercise_code" id="exerciseCode" required>
+                <div id="dropdown" style="display:none; position:absolute; top:100%; left:0; right:0;
+                     background:#0f3460; border:1px solid #333; border-radius:0 0 8px 8px;
+                     max-height:200px; overflow-y:auto; z-index:10;">
+                </div>
+            </div>
+            <div class="num-row" id="numRow">
+                <div class="form-group" id="num1Group" style="display:none">
+                    <label id="num1Label">Num1</label>
+                    <input type="number" name="num1" id="num1" step="any" min="0">
+                </div>
+                <div class="form-group" id="num2Group" style="display:none">
+                    <label id="num2Label">Num2</label>
+                    <input type="number" name="num2" id="num2" step="1" min="0">
+                </div>
+                <div class="form-group" id="num3Group" style="display:none">
+                    <label id="num3Label">Num3</label>
+                    <input type="number" name="num3" id="num3" step="any" min="0">
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Notes</label>
+                <input type="text" name="notes" placeholder="Optional">
+            </div>
+            <button type="submit" class="add-btn">Add</button>
+        </form>
+    </div>
+
+    <div class="entries">
+        <h2>{{ selected_date }}</h2>
+        {% if entries %}
+            {% for e in entries %}
+            <div class="entry-card">
+                <div class="entry-info">
+                    <div class="entry-name">
+                        <span class="cat-dot cat-{{ e.category }}"></span>
+                        {{ e.exercise_code }} — {{ e.name }}
+                    </div>
+                    <div class="entry-values">
+                        {% if e.input_type == 'reps_sets' and e.num1 is not none %}
+                            {{ e.num1|int }} reps × {{ e.num2|int }} sets
+                        {% elif e.input_type == 'time_sets' and e.num1 is not none %}
+                            {{ e.num1|int }}s × {{ e.num2|int }} sets
+                        {% elif e.input_type == 'distance' and e.num1 is not none %}
+                            {{ e.num1 }} km
+                        {% else %}
+                            ✓ Done
+                        {% endif %}
+                    </div>
+                    {% if e.notes %}
+                    <div class="entry-notes">{{ e.notes }}</div>
+                    {% endif %}
+                </div>
+                <form method="POST" action="/delete/{{ e.id }}"
+                      onsubmit="return confirm('Delete?')">
+                    <input type="hidden" name="date" value="{{ selected_date }}">
+                    <input type="hidden" name="redirect" value="/m">
+                    <button class="delete-btn">✕</button>
+                </form>
+            </div>
+            {% endfor %}
+        {% else %}
+            <p class="empty">No exercises yet today.</p>
+        {% endif %}
+    </div>
+
+    <script>
+        const inputTypes = {{ input_types|tojson }};
+        const exercises = {{ exercises|tojson }};
+        const codeInput = document.getElementById('codeInput');
+        const exerciseCode = document.getElementById('exerciseCode');
+        const dropdown = document.getElementById('dropdown');
+        let activeIdx = -1;
+
+        function updateNumFields(inputType) {
+            const fields = inputTypes[inputType] || {};
+            ['num1', 'num2', 'num3'].forEach(function(key) {
+                const group = document.getElementById(key + 'Group');
+                const input = document.getElementById(key);
+                if (fields[key]) {
+                    group.style.display = '';
+                    document.getElementById(key + 'Label').textContent = fields[key];
+                    input.required = true;
+                } else {
+                    group.style.display = 'none';
+                    input.value = '';
+                    input.required = false;
+                }
+            });
+        }
+
+        function selectExercise(ex) {
+            codeInput.value = ex.code + ' — ' + ex.name;
+            exerciseCode.value = ex.code;
+            dropdown.style.display = 'none';
+            updateNumFields(ex.input_type);
+            const firstNum = document.querySelector('#num1Group:not([style*="display: none"]) input, #num1Group:not([style*="display:none"]) input');
+            if (firstNum) firstNum.focus();
+        }
+
+        function showDropdown(filter) {
+            const val = filter.toUpperCase();
+            const matches = val === '' ? exercises : exercises.filter(function(ex) {
+                return ex.code.toUpperCase().startsWith(val) ||
+                       ex.name.toUpperCase().includes(val);
+            });
+            dropdown.innerHTML = '';
+            activeIdx = -1;
+            if (matches.length === 0) { dropdown.style.display = 'none'; return; }
+            matches.forEach(function(ex) {
+                const div = document.createElement('div');
+                div.className = 'dropdown-item';
+                div.innerHTML = '<span class="code">' + ex.code + '</span> — ' + ex.name +
+                                '<span class="cat">' + ex.category + '</span>';
+                div.addEventListener('mousedown', function(e) {
+                    e.preventDefault();
+                    selectExercise(ex);
+                });
+                dropdown.appendChild(div);
+            });
+            dropdown.style.display = 'block';
+        }
+
+        codeInput.addEventListener('input', function() {
+            exerciseCode.value = '';
+            showDropdown(this.value.trim());
+        });
+
+        codeInput.addEventListener('focus', function() {
+            if (!exerciseCode.value) showDropdown(this.value.trim());
+        });
+
+        codeInput.addEventListener('blur', function() {
+            setTimeout(function() { dropdown.style.display = 'none'; }, 150);
+        });
+
+        codeInput.addEventListener('keydown', function(e) {
+            const items = dropdown.querySelectorAll('.dropdown-item');
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                activeIdx = Math.min(activeIdx + 1, items.length - 1);
+                items.forEach(function(el, i) { el.classList.toggle('active', i === activeIdx); });
+                if (items[activeIdx]) items[activeIdx].scrollIntoView({block: 'nearest'});
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                activeIdx = Math.max(activeIdx - 1, 0);
+                items.forEach(function(el, i) { el.classList.toggle('active', i === activeIdx); });
+            } else if (e.key === 'Enter' && activeIdx >= 0 && items.length > 0) {
+                e.preventDefault();
+                const val = codeInput.value.trim().toUpperCase();
+                const matches = val === '' ? exercises : exercises.filter(function(ex) {
+                    return ex.code.toUpperCase().startsWith(val) || ex.name.toUpperCase().includes(val);
+                });
+                if (matches[activeIdx]) selectExercise(matches[activeIdx]);
+            }
+        });
+    </script>
+</body>
+</html>
