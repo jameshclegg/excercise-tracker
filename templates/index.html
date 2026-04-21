@@ -111,17 +111,13 @@
                     </div>
                 </div>
                 <div class="num-fields" id="numFields">
-                    <div class="form-group" id="num1Group" style="display:none">
-                        <label id="num1Label">Num1</label>
-                        <input type="number" name="num1" id="num1" step="any" min="0">
+                    <div class="form-group" id="setsGroup" style="display:none">
+                        <label id="setsLabel">Sets</label>
+                        <input type="text" name="sets" id="setsInput" placeholder="e.g. 15+12+10" style="width:160px;">
                     </div>
-                    <div class="form-group" id="num2Group" style="display:none">
-                        <label id="num2Label">Num2</label>
-                        <input type="number" name="num2" id="num2" step="1" min="0">
-                    </div>
-                    <div class="form-group" id="num3Group" style="display:none">
-                        <label id="num3Label">Num3</label>
-                        <input type="number" name="num3" id="num3" step="any" min="0">
+                    <div class="form-group" id="weightGroup" style="display:none">
+                        <label>Weight (kg)</label>
+                        <input type="number" name="weight" id="weightInput" step="0.5" min="0" style="width:100px;">
                     </div>
                 </div>
                 <div class="form-group">
@@ -150,14 +146,18 @@
                 <td><strong>{{ e.exercise_code }}</strong> — {{ e.name }}</td>
                 <td><span class="cat-badge cat-{{ e.category }}">{{ e.category }}</span></td>
                 <td>
-                    {% if e.input_type == 'reps_sets' and e.num1 is not none %}
-                        {{ e.num1|int }} reps × {{ e.num2|int }} sets
-                    {% elif e.input_type == 'time_sets' and e.num1 is not none %}
-                        {{ e.num1|int }}s × {{ e.num2|int }} sets
-                    {% elif e.input_type == 'distance' and e.num1 is not none %}
-                        {{ e.num1 }} km
+                    {% if e.sets %}
+                        {% if e.input_type == 'distance' %}
+                            {{ e.sets }} km
+                        {% elif e.input_type == 'reps_sets' %}
+                            {{ e.sets }} reps{% if e.weight %} @ {{ e.weight }}kg{% endif %}
+                        {% elif e.input_type == 'time_sets' %}
+                            {{ e.sets }}s{% if e.weight %} @ {{ e.weight }}kg{% endif %}
+                        {% else %}
+                            {{ e.sets }}
+                        {% endif %}
                     {% else %}
-                        —
+                        ✓ Done
                     {% endif %}
                 </td>
                 <td>{{ e.notes or '—' }}</td>
@@ -187,19 +187,27 @@
 
         function updateNumFields(inputType) {
             const fields = inputTypes[inputType] || {};
-            ['num1', 'num2', 'num3'].forEach(function(key) {
-                const group = document.getElementById(key + 'Group');
-                const input = document.getElementById(key);
-                if (fields[key]) {
-                    group.style.display = '';
-                    document.getElementById(key + 'Label').textContent = fields[key];
-                    input.required = true;
-                } else {
-                    group.style.display = 'none';
-                    input.value = '';
-                    input.required = false;
-                }
-            });
+            const setsGroup = document.getElementById('setsGroup');
+            const setsInput = document.getElementById('setsInput');
+            const setsLabel = document.getElementById('setsLabel');
+            const weightGroup = document.getElementById('weightGroup');
+            const weightInput = document.getElementById('weightInput');
+
+            if (fields['sets']) {
+                setsGroup.style.display = '';
+                setsLabel.textContent = fields['sets'];
+                setsInput.required = true;
+            } else {
+                setsGroup.style.display = 'none';
+                setsInput.value = '';
+                setsInput.required = false;
+            }
+            if (fields['weight']) {
+                weightGroup.style.display = '';
+            } else {
+                weightGroup.style.display = 'none';
+                weightInput.value = '';
+            }
         }
 
         function selectExercise(ex) {
@@ -207,9 +215,8 @@
             exerciseCode.value = ex.code;
             dropdown.style.display = 'none';
             updateNumFields(ex.input_type);
-            // Focus first visible numeric field
-            const firstNum = document.querySelector('#num1Group:not([style*="display: none"]) input, #num1Group:not([style*="display:none"]) input');
-            if (firstNum) firstNum.focus();
+            var firstField = document.querySelector('#setsGroup:not([style*="display: none"]) input, #setsGroup:not([style*="display:none"]) input');
+            if (firstField) firstField.focus();
         }
 
         function showDropdown(filter) {

@@ -27,11 +27,11 @@ PASSWORD_HASH = os.environ.get("TIMELINE_PASSWORD", "")
 
 EXERCISES_FILE = os.path.join(os.path.dirname(__file__), "exercises.txt")
 
-# Input type determines which numeric fields are shown
+# Input type determines which fields are shown in the UI
 INPUT_TYPES = {
-    "reps_sets": {"num1": "Reps", "num2": "Sets"},
-    "time_sets": {"num1": "Time (sec)", "num2": "Sets"},
-    "distance": {"num1": "Distance (km)"},
+    "reps_sets": {"sets": "Sets (e.g. 15+12+10)", "weight": "Weight (kg)"},
+    "time_sets": {"sets": "Sets (sec, e.g. 45+45+45)", "weight": "Weight (kg)"},
+    "distance": {"sets": "Distance (km)"},
     "none": {},
 }
 
@@ -67,14 +67,20 @@ def init_db():
             input_type TEXT NOT NULL
         )
     """)
+    # Migrate: drop old schema if it has num1/num2/num3 columns
+    cur.execute("""
+        SELECT column_name FROM information_schema.columns
+        WHERE table_name = 'entries' AND column_name = 'num1'
+    """)
+    if cur.fetchone():
+        cur.execute("DROP TABLE entries")
     cur.execute("""
         CREATE TABLE IF NOT EXISTS entries (
             id SERIAL PRIMARY KEY,
             date DATE NOT NULL,
             exercise_code TEXT NOT NULL REFERENCES exercises(code),
-            num1 REAL,
-            num2 REAL,
-            num3 REAL,
+            sets TEXT,
+            weight NUMERIC(6,2),
             notes TEXT,
             created_at TIMESTAMPTZ DEFAULT NOW()
         )
@@ -237,23 +243,20 @@ def mobile():
 def add_entry():
     exercise_code = request.form.get("exercise_code", "").strip()
     entry_date = request.form.get("date", date.today().isoformat())
-    num1 = request.form.get("num1")
-    num2 = request.form.get("num2")
-    num3 = request.form.get("num3")
+    sets_val = request.form.get("sets", "").strip() or None
+    weight = request.form.get("weight")
     notes = request.form.get("notes", "").strip() or None
 
-    num1 = float(num1) if num1 else None
-    num2 = float(num2) if num2 else None
-    num3 = float(num3) if num3 else None
+    weight = float(weight) if weight else None
 
     conn = get_db()
     cur = conn.cursor()
     cur.execute(
         """
-        INSERT INTO entries (date, exercise_code, num1, num2, num3, notes)
-        VALUES (%s, %s, %s, %s, %s, %s)
+        INSERT INTO entries (date, exercise_code, sets, weight, notes)
+        VALUES (%s, %s, %s, %s, %s)
         """,
-        (entry_date, exercise_code, num1, num2, num3, notes),
+        (entry_date, exercise_code, sets_val, weight, notes),
     )
     cur.close()
     conn.close()
