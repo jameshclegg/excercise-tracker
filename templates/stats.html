@@ -416,15 +416,24 @@
             headerRow.appendChild(headerDots);
             container.appendChild(headerRow);
 
-            // Group exercises by category
+            // Group exercises by category, split active vs dormant (3+ months inactive)
             const byCategory = {};
+            const dormantByCategory = {};
+            const dormantThreshold = 90; // days
             exercises.forEach(ex => {
                 if (!timelineData[ex.code]) return;
-                if (!byCategory[ex.category]) byCategory[ex.category] = [];
-                byCategory[ex.category].push(ex);
+                const dates = timelineData[ex.code];
+                const lastDate = new Date(dates[dates.length - 1]);
+                const daysSinceLast = Math.ceil((today - lastDate) / 86400000);
+                const isDormant = daysSinceLast > dormantThreshold;
+                const target = isDormant ? dormantByCategory : byCategory;
+                if (!target[ex.category]) target[ex.category] = [];
+                target[ex.category].push(ex);
             });
 
             const categoryOrder = ['strength', 'isometric', 'skill', 'fitness', 'flexibility'];
+
+            // Render active exercises
             categoryOrder.forEach(cat => {
                 const exList = byCategory[cat];
                 if (!exList || exList.length === 0) return;
@@ -456,7 +465,6 @@
                         const dot = document.createElement('div');
                         dot.className = 'timeline-dot';
                         dot.style.background = dates.has(key) ? catColors[cat] : '#222';
-                        // Quarter boundary markers (Jan 1, Apr 1, Jul 1, Oct 1)
                         if (d.getDate() === 1 && [0, 3, 6, 9].includes(d.getMonth())) {
                             dot.classList.add('quarter-line');
                         }
@@ -467,6 +475,55 @@
                     container.appendChild(row);
                 });
             });
+
+            // Render dormant section
+            const hasDormant = Object.values(dormantByCategory).some(l => l.length > 0);
+            if (hasDormant) {
+                const sep = document.createElement('div');
+                sep.style.cssText = 'border-top:2px solid #555; margin:12px 0 8px 0; position:relative;';
+                const sepLabel = document.createElement('span');
+                sepLabel.style.cssText = 'position:absolute; top:-10px; left:8px; background:#0a0a23; padding:0 8px; color:#888; font-size:0.75rem;';
+                sepLabel.textContent = 'DORMANT (3+ months inactive)';
+                sep.appendChild(sepLabel);
+                container.appendChild(sep);
+
+                categoryOrder.forEach(cat => {
+                    const exList = dormantByCategory[cat];
+                    if (!exList || exList.length === 0) return;
+
+                    exList.forEach(ex => {
+                        const dates = new Set(timelineData[ex.code] || []);
+                        const row = document.createElement('div');
+                        row.className = 'timeline-row';
+
+                        const label = document.createElement('div');
+                        label.className = 'timeline-label';
+                        label.style.opacity = '0.5';
+                        label.textContent = ex.code + ' — ' + ex.name;
+                        label.title = ex.name;
+                        row.appendChild(label);
+
+                        const dotsDiv = document.createElement('div');
+                        dotsDiv.className = 'timeline-dots';
+
+                        for (let i = 0; i < totalDays; i++) {
+                            const d = new Date(startDate);
+                            d.setDate(d.getDate() + i);
+                            const key = d.toISOString().split('T')[0];
+                            const dot = document.createElement('div');
+                            dot.className = 'timeline-dot';
+                            dot.style.background = dates.has(key) ? catColors[cat] : '#1a1a1a';
+                            if (d.getDate() === 1 && [0, 3, 6, 9].includes(d.getMonth())) {
+                                dot.classList.add('quarter-line');
+                            }
+                            dotsDiv.appendChild(dot);
+                        }
+
+                        row.appendChild(dotsDiv);
+                        container.appendChild(row);
+                    });
+                });
+            }
         })();
 
         // ===== 2b. DENSITY TIMELINE =====
