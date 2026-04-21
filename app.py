@@ -455,18 +455,22 @@ def stats():
     # Sort by days_since (most neglected first)
     exercise_stats.sort(key=lambda x: x["days_since"], reverse=True)
 
-    # Monthly narratives
+    # Quarterly narratives
     from collections import defaultdict
-    monthly_entries = defaultdict(list)
+    quarterly_entries = defaultdict(list)
     for entry in all_entries:
-        month_key = entry["date"].strftime("%Y-%m")
-        monthly_entries[month_key].append(entry)
+        m = entry["date"].month
+        q = (m - 1) // 3 + 1
+        q_key = f"{entry['date'].year}-Q{q}"
+        quarterly_entries[q_key].append(entry)
 
-    monthly_narratives = []
-    prev_month_codes = set()
-    for month_key in sorted(monthly_entries.keys()):
-        entries = monthly_entries[month_key]
-        month_label = datetime.strptime(month_key, "%Y-%m").strftime("%B %Y")
+    quarter_labels = {1: "Jan–Mar", 2: "Apr–Jun", 3: "Jul–Sep", 4: "Oct–Dec"}
+    quarterly_narratives = []
+    prev_quarter_codes = set()
+    for q_key in sorted(quarterly_entries.keys()):
+        entries = quarterly_entries[q_key]
+        year, q_num = q_key.split("-Q")
+        q_label = f"{quarter_labels[int(q_num)]} {year}"
 
         # Count exercises and active days
         code_counts = defaultdict(int)
@@ -477,7 +481,7 @@ def stats():
 
         # Top exercises
         top = sorted(code_counts.items(), key=lambda x: x[1], reverse=True)
-        top_names = [f"{exercise_map[c]['name']} ({n}x)" for c, n in top[:5] if c in exercise_map]
+        top_names = [f"{exercise_map[c]['name']} ({n}x)" for c, n in top[:7] if c in exercise_map]
 
         # Category breakdown
         cat_counts = defaultdict(int)
@@ -485,24 +489,29 @@ def stats():
             cat_counts[e["category"]] += 1
         dominant_cat = max(cat_counts.items(), key=lambda x: x[1])[0] if cat_counts else "none"
 
-        # New exercises this month (not in previous month)
+        # New exercises this quarter (not in previous quarter)
         current_codes = set(code_counts.keys())
-        new_exercises = current_codes - prev_month_codes if prev_month_codes else set()
-        dropped = prev_month_codes - current_codes if prev_month_codes else set()
+        new_exercises = current_codes - prev_quarter_codes if prev_quarter_codes else set()
+        dropped = prev_quarter_codes - current_codes if prev_quarter_codes else set()
 
         # Progress tracking for key exercises
         progress_notes = []
+        q_month_prefixes = []
+        q_int = int(q_num)
+        for m in range((q_int - 1) * 3 + 1, q_int * 3 + 1):
+            q_month_prefixes.append(f"{year}-{m:02d}")
+
         for code in list(code_counts.keys()):
             if code not in progress_data:
                 continue
             pd = progress_data[code]
-            month_values = []
+            q_values = []
             for d, v in zip(pd["dates"], pd["values"]):
-                if d.startswith(month_key):
-                    month_values.append(v)
-            if len(month_values) >= 2:
-                first_val = month_values[0]
-                last_val = month_values[-1]
+                if any(d.startswith(p) for p in q_month_prefixes):
+                    q_values.append(v)
+            if len(q_values) >= 3:
+                first_val = q_values[0]
+                last_val = q_values[-1]
                 if last_val > first_val * 1.1:
                     unit = "km" if pd["input_type"] == "distance" else "reps" if pd["input_type"] == "reps_sets" else "sec"
                     name = exercise_map[code]["name"] if code in exercise_map else code
@@ -526,24 +535,24 @@ def stats():
         if new_exercises:
             new_names = [exercise_map[c]["name"] for c in new_exercises if c in exercise_map]
             if new_names:
-                parts.append(f"🆕 Started: {', '.join(sorted(new_names)[:5])}.")
+                parts.append(f"🆕 Started: {', '.join(sorted(new_names)[:6])}.")
         if dropped:
             drop_names = [exercise_map[c]["name"] for c in dropped if c in exercise_map]
-            if drop_names and len(drop_names) <= 8:
-                parts.append(f"⏸️ Paused: {', '.join(sorted(drop_names)[:5])}.")
+            if drop_names and len(drop_names) <= 10:
+                parts.append(f"⏸️ Paused: {', '.join(sorted(drop_names)[:6])}.")
 
         if progress_notes:
-            parts.append("📈 " + ". ".join(progress_notes[:3]) + ".")
+            parts.append("📈 " + ". ".join(progress_notes[:4]) + ".")
 
-        monthly_narratives.append({
-            "month": month_key,
-            "label": month_label,
+        quarterly_narratives.append({
+            "quarter": q_key,
+            "label": q_label,
             "narrative": " ".join(parts),
             "active_days": len(active_days),
             "total_entries": len(entries),
         })
 
-        prev_month_codes = current_codes
+        prev_quarter_codes = current_codes
 
     # Personal bests
     personal_bests = []
@@ -599,7 +608,7 @@ def stats():
         exercise_stats=exercise_stats,
         personal_bests=personal_bests,
         exercise_map=exercise_map,
-        monthly_narratives=monthly_narratives,
+        monthly_narratives=quarterly_narratives,
     )
 
 
