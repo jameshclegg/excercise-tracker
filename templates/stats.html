@@ -42,6 +42,7 @@
                           white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .timeline-dots { display: flex; gap: 1px; flex: 1; }
         .timeline-dot { width: 3px; height: 14px; border-radius: 1px; }
+        .timeline-dot.quarter-line { border-left: 1px solid #555; margin-left: 2px; padding-left: 2px; }
         .timeline-category-header { font-size: 0.75rem; font-weight: 700; padding: 6px 0 2px;
                                      text-transform: uppercase; letter-spacing: 1px; }
 
@@ -364,6 +365,40 @@
 
             const totalDays = Math.ceil((today - startDate) / 86400000);
 
+            // Add quarter labels header row
+            const headerRow = document.createElement('div');
+            headerRow.className = 'timeline-row';
+            const headerLabel = document.createElement('div');
+            headerLabel.className = 'timeline-label';
+            headerLabel.style.color = '#555';
+            headerLabel.textContent = '';
+            headerRow.appendChild(headerLabel);
+            const headerDots = document.createElement('div');
+            headerDots.className = 'timeline-dots';
+            headerDots.style.position = 'relative';
+            for (let i = 0; i < totalDays; i++) {
+                const d = new Date(startDate);
+                d.setDate(d.getDate() + i);
+                const dot = document.createElement('div');
+                dot.className = 'timeline-dot';
+                dot.style.background = 'transparent';
+                dot.style.height = '16px';
+                if (d.getDate() === 1 && [0, 3, 6, 9].includes(d.getMonth())) {
+                    dot.classList.add('quarter-line');
+                    dot.style.position = 'relative';
+                    const lbl = document.createElement('span');
+                    lbl.style.cssText = 'position:absolute;top:-2px;left:2px;font-size:0.65rem;color:#888;white-space:nowrap;';
+                    const qNames = ['Q1','Q2','Q2','Q2','Q3','Q3','Q3','Q4','Q4','Q4','Q1','Q1'];
+                    const monthNames = ['Jan','Apr','Jul','Oct'];
+                    const mIdx = [0,3,6,9].indexOf(d.getMonth());
+                    lbl.textContent = monthNames[mIdx] + ' ' + d.getFullYear().toString().slice(2);
+                    dot.appendChild(lbl);
+                }
+                headerDots.appendChild(dot);
+            }
+            headerRow.appendChild(headerDots);
+            container.appendChild(headerRow);
+
             // Group exercises by category
             const byCategory = {};
             exercises.forEach(ex => {
@@ -404,6 +439,10 @@
                         const dot = document.createElement('div');
                         dot.className = 'timeline-dot';
                         dot.style.background = dates.has(key) ? catColors[cat] : '#222';
+                        // Quarter boundary markers (Jan 1, Apr 1, Jul 1, Oct 1)
+                        if (d.getDate() === 1 && [0, 3, 6, 9].includes(d.getMonth())) {
+                            dot.classList.add('quarter-line');
+                        }
                         dotsDiv.appendChild(dot);
                     }
 
