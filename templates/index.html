@@ -3,6 +3,7 @@
 <head>
     <title>Exercise Tracker</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
@@ -65,13 +66,77 @@
         .dropdown-item:hover, .dropdown-item.active { background: #16213e; }
         .dropdown-item .code { font-weight: 700; color: #00d4ff; }
         .dropdown-item .cat { font-size: 0.75rem; color: #888; margin-left: 8px; }
+
+        /* Stats styles */
+        .stats-separator { border: none; border-top: 2px solid #333; margin: 2rem 0; }
+        .dashboard { max-width: 1400px; margin: 0 auto; }
+        .card { background: #16213e; border-radius: 12px; padding: 1.5rem;
+                margin-bottom: 1.5rem; }
+        .card h2 { display: flex; align-items: center; gap: 0.5rem; color: #00d4ff;
+                    margin-bottom: 1rem; font-size: 1.2rem; }
+        .heatmap-container { overflow-x: auto; }
+        .heatmap { display: flex; gap: 2px; }
+        .heatmap-week { display: flex; flex-direction: column; gap: 2px; }
+        .heatmap-day { width: 14px; height: 14px; border-radius: 2px; }
+        .heatmap-labels { display: flex; flex-direction: column; gap: 2px; margin-right: 6px;
+                          justify-content: flex-start; padding-top: 20px; }
+        .heatmap-label { height: 14px; font-size: 10px; color: #888; line-height: 14px; }
+        .heatmap-months { display: flex; gap: 2px; margin-left: 26px; margin-bottom: 4px; }
+        .heatmap-month { font-size: 10px; color: #888; }
+        .heatmap-legend { display: flex; align-items: center; gap: 4px; margin-top: 8px;
+                          font-size: 11px; color: #888; }
+        .heatmap-legend-box { width: 12px; height: 12px; border-radius: 2px; }
+        .timeline-container { overflow-x: auto; max-height: 600px; overflow-y: auto; }
+        .timeline-row { display: flex; align-items: center; margin-bottom: 2px; }
+        .timeline-label { width: 140px; min-width: 140px; font-size: 0.8rem; padding-right: 8px;
+                          white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .timeline-dots { display: flex; gap: 1px; flex: 1; }
+        .timeline-dot { width: 2px; height: 14px; border-radius: 1px; }
+        .timeline-dot.quarter-line { border-left: 1px solid #555; margin-left: 2px; padding-left: 2px; }
+        .timeline-category-header { font-size: 0.75rem; font-weight: 700; padding: 6px 0 2px;
+                                     text-transform: uppercase; letter-spacing: 1px; }
+        .progress-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+                         gap: 1rem; }
+        .progress-card { background: #0f3460; border-radius: 8px; padding: 1rem; }
+        .progress-card h3 { color: #00d4ff; font-size: 0.9rem; margin-bottom: 0.5rem; }
+        .pb-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+                   gap: 1rem; }
+        .pb-card { background: #0f3460; border-radius: 8px; padding: 1rem; text-align: center; }
+        .pb-card .pb-value { font-size: 1.8rem; font-weight: 700; color: #00d4ff; }
+        .pb-card .pb-exercise { font-size: 0.85rem; color: #ccc; margin-top: 0.3rem; }
+        .pb-card .pb-date { font-size: 0.75rem; color: #888; margin-top: 0.2rem; }
+        .stats-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+        .stats-table th { text-align: left; padding: 8px 10px; color: #888; font-size: 0.75rem;
+                          border-bottom: 1px solid #333; white-space: nowrap; }
+        .stats-table td { padding: 8px 10px; border-bottom: 1px solid #222; }
+        .stats-table tr:hover { background: #0f3460; }
+        .neglect-bar { height: 6px; border-radius: 3px; background: #333; position: relative;
+                       overflow: hidden; min-width: 60px; }
+        .neglect-fill { height: 100%; border-radius: 3px; }
+        .streak-badge { display: inline-block; padding: 2px 6px; border-radius: 4px;
+                        font-size: 0.75rem; font-weight: 600; }
+        .chart-row { display: grid; grid-template-columns: 2fr 1fr; gap: 1.5rem; }
+        .monthly-stories { display: flex; flex-direction: column; gap: 1rem; }
+        .story-month { background: #0f3460; border-radius: 10px; padding: 1rem 1.2rem;
+                       border-left: 4px solid #00d4ff; }
+        .story-header { display: flex; justify-content: space-between; align-items: center;
+                        margin-bottom: 0.5rem; }
+        .story-month-label { font-weight: 700; font-size: 1.05rem; color: #00d4ff; }
+        .story-stats { font-size: 0.8rem; color: #888; }
+        .story-text { font-size: 0.9rem; line-height: 1.6; color: #ccc; }
+        .scroll-hint { font-size: 0.75rem; color: #666; margin-bottom: 0.5rem; }
+        @media (max-width: 768px) {
+            .chart-row { grid-template-columns: 1fr; }
+            .progress-grid { grid-template-columns: 1fr; }
+            .pb-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+            .timeline-label { width: 100px; min-width: 100px; font-size: 0.7rem; }
+        }
     </style>
 </head>
 <body>
     <div class="header">
         <h1>🏋️ Exercise Tracker</h1>
         <div class="header-links">
-            <a href="/stats?">📊 Stats</a>
             <a href="/m?date={{ selected_date }}">📱 Mobile</a>
             <a href="/logout">Logout</a>
         </div>
@@ -169,7 +234,710 @@
         {% endif %}
     </div>
 
+    <!-- Stats Section -->
+    <hr class="stats-separator">
+    <div class="dashboard">
+        <h1 style="color:#00d4ff; margin-bottom:1.5rem;">📊 Stats</h1>
+
+        <!-- 1. Activity Heatmap -->
+        <div class="card">
+            <h2>🟩 Activity Heatmap</h2>
+            <p class="scroll-hint">Last 12 months · scroll horizontally if needed</p>
+            <div class="heatmap-container">
+                <div class="heatmap-months" id="heatmapMonths"></div>
+                <div style="display:flex;">
+                    <div class="heatmap-labels">
+                        <div class="heatmap-label">&nbsp;</div>
+                        <div class="heatmap-label">Mon</div>
+                        <div class="heatmap-label">&nbsp;</div>
+                        <div class="heatmap-label">Wed</div>
+                        <div class="heatmap-label">&nbsp;</div>
+                        <div class="heatmap-label">Fri</div>
+                        <div class="heatmap-label">&nbsp;</div>
+                    </div>
+                    <div class="heatmap" id="heatmap"></div>
+                </div>
+                <div class="heatmap-legend">
+                    <span>Less</span>
+                    <div class="heatmap-legend-box" style="background:#161b22;"></div>
+                    <div class="heatmap-legend-box" style="background:#0e4429;"></div>
+                    <div class="heatmap-legend-box" style="background:#006d32;"></div>
+                    <div class="heatmap-legend-box" style="background:#26a641;"></div>
+                    <div class="heatmap-legend-box" style="background:#39d353;"></div>
+                    <span>More</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 2. Exercise Timeline -->
+        <div class="card">
+            <h2>📅 Exercise Timeline</h2>
+            <p class="scroll-hint">Each row shows when an exercise was done · grouped by category</p>
+            <div class="timeline-container" id="timeline"></div>
+        </div>
+
+        <!-- 2b. Density Timeline -->
+        <div class="card">
+            <h2>🌡️ Training Density</h2>
+            <p class="scroll-hint">14-day rolling frequency per exercise · darker = more frequent</p>
+            <div class="timeline-container" id="densityTimeline"></div>
+        </div>
+
+        <!-- 3. Weekly Volume + Category Balance -->
+        <div class="chart-row">
+            <div class="card">
+                <h2>📊 Weekly Volume</h2>
+                <canvas id="weeklyChart"></canvas>
+            </div>
+            <div class="card">
+                <h2>🎯 Category Balance</h2>
+                <canvas id="categoryChart"></canvas>
+            </div>
+        </div>
+
+        <!-- 4. Monthly Summary -->
+        <div class="card">
+            <h2>📆 Monthly Summary</h2>
+            <canvas id="monthlyChart"></canvas>
+        </div>
+
+        <!-- 4b. Quarterly Story -->
+        <div class="card">
+            <h2>📖 Your Training Story</h2>
+            <div class="monthly-stories">
+                {% for m in monthly_narratives|reverse %}
+                <div class="story-month">
+                    <div class="story-header">
+                        <span class="story-month-label">{{ m.label }}</span>
+                        <span class="story-stats">{{ m.active_days }} days · {{ m.total_entries }} entries</span>
+                    </div>
+                    <p class="story-text">{{ m.narrative|safe }}</p>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- 5. Progress Charts -->
+        <div class="card">
+            <h2>📈 Progress Charts</h2>
+            <p class="scroll-hint">Exercises with 5+ data points · showing total volume per session</p>
+            <div class="progress-grid" id="progressGrid"></div>
+        </div>
+
+        <!-- 6. Personal Bests -->
+        <div class="card">
+            <h2>🏆 Personal Bests</h2>
+            <div class="pb-grid">
+                {% for pb in personal_bests %}
+                <div class="pb-card">
+                    <div class="pb-value">{{ pb.label }}</div>
+                    <div class="pb-exercise">
+                        <span class="cat-badge cat-{{ pb.category }}">{{ pb.code }}</span>
+                        {{ pb.name }}
+                    </div>
+                    <div class="pb-date">{{ pb.date }}</div>
+                </div>
+                {% endfor %}
+                {% if not personal_bests %}
+                <p style="color:#666;">No personal bests recorded yet.</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- 7. Consistency Scores -->
+        <div class="card">
+            <h2>📋 Consistency Scores</h2>
+            <p class="scroll-hint">Sorted by most neglected first</p>
+            <div style="overflow-x:auto;">
+                <table class="stats-table">
+                    <thead>
+                        <tr>
+                            <th>Exercise</th>
+                            <th>Category</th>
+                            <th>Total</th>
+                            <th>Last Done</th>
+                            <th>Days Ago</th>
+                            <th>Current Streak</th>
+                            <th>Best Streak</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for s in exercise_stats %}
+                        <tr>
+                            <td><strong>{{ s.code }}</strong> — {{ s.name }}</td>
+                            <td><span class="cat-badge cat-{{ s.category }}">{{ s.category }}</span></td>
+                            <td>{{ s.total_count }}</td>
+                            <td>{{ s.last_done }}</td>
+                            <td>
+                                <div style="display:flex;align-items:center;gap:6px;">
+                                    <div class="neglect-bar" style="width:80px;">
+                                        <div class="neglect-fill" style="width:{{ [s.days_since, 100]|min }}%;
+                                            background:{% if s.days_since < 7 %}#2ecc71{% elif s.days_since < 30 %}#f39c12{% else %}#e74c3c{% endif %};"></div>
+                                    </div>
+                                    <span>{{ s.days_since }}d</span>
+                                </div>
+                            </td>
+                            <td>
+                                {% if s.current_streak > 0 %}
+                                <span class="streak-badge" style="background:#2ecc7133;color:#2ecc71;">🔥 {{ s.current_streak }}d</span>
+                                {% else %}—{% endif %}
+                            </td>
+                            <td>{{ s.longest_streak }}d</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
     <script>
+        const dailyCounts = {{ daily_counts_json|safe }};
+        const dailyExercises = {{ daily_exercises_json|safe }};
+        const timelineData = {{ timeline_json|safe }};
+        const progressData = {{ progress_json|safe }};
+        const categoryDist = {{ category_dist_json|safe }};
+        const weeklyVolume = {{ weekly_volume_json|safe }};
+        const monthlyVolume = {{ monthly_volume_json|safe }};
+        const exercises = {{ exercises_json|safe }};
+
+        const catColors = {
+            strength: '#e74c3c',
+            isometric: '#f39c12',
+            skill: '#9b59b6',
+            fitness: '#2ecc71',
+            flexibility: '#3498db'
+        };
+        const catColorsBg = {
+            strength: 'rgba(231,76,60,0.2)',
+            isometric: 'rgba(243,156,18,0.2)',
+            skill: 'rgba(155,89,182,0.2)',
+            fitness: 'rgba(46,204,113,0.2)',
+            flexibility: 'rgba(52,152,219,0.2)'
+        };
+
+        Chart.defaults.color = '#e0e0e0';
+        Chart.defaults.borderColor = '#333';
+        Chart.defaults.plugins.legend.labels.color = '#e0e0e0';
+
+        // ===== 1. HEATMAP =====
+        (function() {
+            const container = document.getElementById('heatmap');
+            const monthsDiv = document.getElementById('heatmapMonths');
+            const today = new Date();
+            const startDate = new Date(today);
+            startDate.setFullYear(startDate.getFullYear() - 1);
+            startDate.setDate(startDate.getDate() - startDate.getDay());
+
+            const maxCount = Math.max(1, ...Object.values(dailyCounts));
+            const colors = ['#161b22', '#0e4429', '#006d32', '#26a641', '#39d353'];
+
+            function getColor(count) {
+                if (!count) return colors[0];
+                const idx = Math.min(Math.ceil(count / maxCount * 4), 4);
+                return colors[idx];
+            }
+
+            let currentMonth = -1;
+            let weekCount = 0;
+            const d = new Date(startDate);
+            while (d <= today) {
+                const weekDiv = document.createElement('div');
+                weekDiv.className = 'heatmap-week';
+
+                for (let dow = 0; dow < 7; dow++) {
+                    const dayDiv = document.createElement('div');
+                    dayDiv.className = 'heatmap-day';
+                    if (d <= today) {
+                        const key = d.toISOString().split('T')[0];
+                        const count = dailyCounts[key] || 0;
+                        dayDiv.style.background = getColor(count);
+                        const exList = dailyExercises[key] || [];
+                        dayDiv.title = exList.length ? `${key}:\n${exList.join('\n')}` : `${key}: Rest day`;
+                    } else {
+                        dayDiv.style.background = 'transparent';
+                    }
+                    weekDiv.appendChild(dayDiv);
+                    d.setDate(d.getDate() + 1);
+                }
+
+                container.appendChild(weekDiv);
+                weekCount++;
+            }
+
+            const md = new Date(startDate);
+            const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+            let lastMonth = -1;
+            let weekIdx = 0;
+            const md2 = new Date(startDate);
+            while (md2 <= today) {
+                const m = md2.getMonth();
+                if (m !== lastMonth) {
+                    const span = document.createElement('span');
+                    span.className = 'heatmap-month';
+                    span.textContent = monthNames[m];
+                    span.style.marginLeft = (weekIdx * 16) + 'px';
+                    span.style.position = 'absolute';
+                    monthsDiv.appendChild(span);
+                    lastMonth = m;
+                }
+                md2.setDate(md2.getDate() + 7);
+                weekIdx++;
+            }
+            monthsDiv.style.position = 'relative';
+            monthsDiv.style.height = '16px';
+        })();
+
+        // ===== 2. TIMELINE =====
+        (function() {
+            const container = document.getElementById('timeline');
+            const today = new Date();
+            let earliest = today;
+            Object.values(timelineData).forEach(dates => {
+                dates.forEach(d => {
+                    const dt = new Date(d);
+                    if (dt < earliest) earliest = dt;
+                });
+            });
+            const startDate = new Date(earliest);
+            startDate.setDate(1);
+
+            const totalDays = Math.ceil((today - startDate) / 86400000);
+
+            const headerRow = document.createElement('div');
+            headerRow.className = 'timeline-row';
+            const headerLabel = document.createElement('div');
+            headerLabel.className = 'timeline-label';
+            headerLabel.style.color = '#555';
+            headerLabel.textContent = '';
+            headerRow.appendChild(headerLabel);
+            const headerDots = document.createElement('div');
+            headerDots.className = 'timeline-dots';
+            headerDots.style.position = 'relative';
+            for (let i = 0; i < totalDays; i++) {
+                const d = new Date(startDate);
+                d.setDate(d.getDate() + i);
+                const dot = document.createElement('div');
+                dot.className = 'timeline-dot';
+                dot.style.background = 'transparent';
+                dot.style.height = '16px';
+                if (d.getDate() === 1 && [0, 3, 6, 9].includes(d.getMonth())) {
+                    dot.classList.add('quarter-line');
+                    dot.style.position = 'relative';
+                    const lbl = document.createElement('span');
+                    lbl.style.cssText = 'position:absolute;top:-2px;left:2px;font-size:0.65rem;color:#888;white-space:nowrap;';
+                    const qNames = ['Q1','Q2','Q2','Q2','Q3','Q3','Q3','Q4','Q4','Q4','Q1','Q1'];
+                    const monthNames = ['Jan','Apr','Jul','Oct'];
+                    const mIdx = [0,3,6,9].indexOf(d.getMonth());
+                    lbl.textContent = monthNames[mIdx] + ' ' + d.getFullYear().toString().slice(2);
+                    dot.appendChild(lbl);
+                }
+                headerDots.appendChild(dot);
+            }
+            headerRow.appendChild(headerDots);
+            container.appendChild(headerRow);
+
+            const byCategory = {};
+            const dormantByCategory = {};
+            const dormantThreshold = 90;
+            exercises.forEach(ex => {
+                if (!timelineData[ex.code]) return;
+                const dates = timelineData[ex.code];
+                const lastDate = new Date(dates[dates.length - 1]);
+                const daysSinceLast = Math.ceil((today - lastDate) / 86400000);
+                const isDormant = daysSinceLast > dormantThreshold;
+                const target = isDormant ? dormantByCategory : byCategory;
+                if (!target[ex.category]) target[ex.category] = [];
+                target[ex.category].push(ex);
+            });
+
+            const categoryOrder = ['strength', 'isometric', 'skill', 'fitness', 'flexibility'];
+
+            categoryOrder.forEach(cat => {
+                const exList = byCategory[cat];
+                if (!exList || exList.length === 0) return;
+
+                const header = document.createElement('div');
+                header.className = 'timeline-category-header';
+                header.style.color = catColors[cat];
+                header.textContent = cat.toUpperCase();
+                container.appendChild(header);
+
+                exList.forEach(ex => {
+                    const dates = new Set(timelineData[ex.code] || []);
+                    const row = document.createElement('div');
+                    row.className = 'timeline-row';
+
+                    const label = document.createElement('div');
+                    label.className = 'timeline-label';
+                    label.textContent = ex.code + ' — ' + ex.name;
+                    label.title = ex.name;
+                    row.appendChild(label);
+
+                    const dotsDiv = document.createElement('div');
+                    dotsDiv.className = 'timeline-dots';
+
+                    for (let i = 0; i < totalDays; i++) {
+                        const d = new Date(startDate);
+                        d.setDate(d.getDate() + i);
+                        const key = d.toISOString().split('T')[0];
+                        const dot = document.createElement('div');
+                        dot.className = 'timeline-dot';
+                        dot.style.background = dates.has(key) ? catColors[cat] : '#222';
+                        if (d.getDate() === 1 && [0, 3, 6, 9].includes(d.getMonth())) {
+                            dot.classList.add('quarter-line');
+                        }
+                        dotsDiv.appendChild(dot);
+                    }
+
+                    row.appendChild(dotsDiv);
+                    container.appendChild(row);
+                });
+            });
+
+            const hasDormant = Object.values(dormantByCategory).some(l => l.length > 0);
+            if (hasDormant) {
+                const sep = document.createElement('div');
+                sep.style.cssText = 'border-top:2px solid #555; margin:12px 0 8px 0; position:relative;';
+                const sepLabel = document.createElement('span');
+                sepLabel.style.cssText = 'position:absolute; top:-10px; left:8px; background:#0a0a23; padding:0 8px; color:#888; font-size:0.75rem;';
+                sepLabel.textContent = 'DORMANT (3+ months inactive)';
+                sep.appendChild(sepLabel);
+                container.appendChild(sep);
+
+                categoryOrder.forEach(cat => {
+                    const exList = dormantByCategory[cat];
+                    if (!exList || exList.length === 0) return;
+
+                    exList.forEach(ex => {
+                        const dates = new Set(timelineData[ex.code] || []);
+                        const row = document.createElement('div');
+                        row.className = 'timeline-row';
+
+                        const label = document.createElement('div');
+                        label.className = 'timeline-label';
+                        label.style.opacity = '0.5';
+                        label.textContent = ex.code + ' — ' + ex.name;
+                        label.title = ex.name;
+                        row.appendChild(label);
+
+                        const dotsDiv = document.createElement('div');
+                        dotsDiv.className = 'timeline-dots';
+
+                        for (let i = 0; i < totalDays; i++) {
+                            const d = new Date(startDate);
+                            d.setDate(d.getDate() + i);
+                            const key = d.toISOString().split('T')[0];
+                            const dot = document.createElement('div');
+                            dot.className = 'timeline-dot';
+                            dot.style.background = dates.has(key) ? catColors[cat] : '#1a1a1a';
+                            if (d.getDate() === 1 && [0, 3, 6, 9].includes(d.getMonth())) {
+                                dot.classList.add('quarter-line');
+                            }
+                            dotsDiv.appendChild(dot);
+                        }
+
+                        row.appendChild(dotsDiv);
+                        container.appendChild(row);
+                    });
+                });
+            }
+        })();
+
+        // ===== 2b. DENSITY TIMELINE =====
+        (function() {
+            const container = document.getElementById('densityTimeline');
+            const today = new Date();
+            let earliest = today;
+            Object.values(timelineData).forEach(dates => {
+                dates.forEach(d => {
+                    const dt = new Date(d);
+                    if (dt < earliest) earliest = dt;
+                });
+            });
+            const startDate = new Date(earliest);
+            startDate.setDate(1);
+            const totalDays = Math.ceil((today - startDate) / 86400000);
+            const WINDOW = 14;
+
+            const headerRow = document.createElement('div');
+            headerRow.className = 'timeline-row';
+            const headerLabel = document.createElement('div');
+            headerLabel.className = 'timeline-label';
+            headerRow.appendChild(headerLabel);
+            const headerDots = document.createElement('div');
+            headerDots.className = 'timeline-dots';
+            for (let i = 0; i < totalDays; i++) {
+                const d = new Date(startDate);
+                d.setDate(d.getDate() + i);
+                const dot = document.createElement('div');
+                dot.className = 'timeline-dot';
+                dot.style.background = 'transparent';
+                dot.style.height = '16px';
+                if (d.getDate() === 1 && [0, 3, 6, 9].includes(d.getMonth())) {
+                    dot.classList.add('quarter-line');
+                    dot.style.position = 'relative';
+                    const lbl = document.createElement('span');
+                    lbl.style.cssText = 'position:absolute;top:-2px;left:2px;font-size:0.65rem;color:#888;white-space:nowrap;';
+                    const monthNames = ['Jan','Apr','Jul','Oct'];
+                    const mIdx = [0,3,6,9].indexOf(d.getMonth());
+                    lbl.textContent = monthNames[mIdx] + ' ' + d.getFullYear().toString().slice(2);
+                    dot.appendChild(lbl);
+                }
+                headerDots.appendChild(dot);
+            }
+            headerRow.appendChild(headerDots);
+            container.appendChild(headerRow);
+
+            const byCategory = {};
+            exercises.forEach(ex => {
+                if (!timelineData[ex.code]) return;
+                if (!byCategory[ex.category]) byCategory[ex.category] = [];
+                byCategory[ex.category].push(ex);
+            });
+
+            const categoryOrder = ['strength', 'isometric', 'skill', 'fitness', 'flexibility'];
+            categoryOrder.forEach(cat => {
+                const exList = byCategory[cat];
+                if (!exList || exList.length === 0) return;
+
+                const header = document.createElement('div');
+                header.className = 'timeline-category-header';
+                header.style.color = catColors[cat];
+                header.textContent = cat.toUpperCase();
+                container.appendChild(header);
+
+                exList.forEach(ex => {
+                    const dateSet = new Set(timelineData[ex.code] || []);
+                    const row = document.createElement('div');
+                    row.className = 'timeline-row';
+
+                    const label = document.createElement('div');
+                    label.className = 'timeline-label';
+                    label.textContent = ex.code + ' — ' + ex.name;
+                    label.title = ex.name;
+                    row.appendChild(label);
+
+                    const dotsDiv = document.createElement('div');
+                    dotsDiv.className = 'timeline-dots';
+
+                    const allDates = [];
+                    for (let i = 0; i < totalDays; i++) {
+                        const d = new Date(startDate);
+                        d.setDate(d.getDate() + i);
+                        allDates.push(d.toISOString().split('T')[0]);
+                    }
+
+                    let windowCount = 0;
+                    const windowQueue = [];
+                    for (let i = 0; i < totalDays; i++) {
+                        const key = allDates[i];
+                        const hit = dateSet.has(key) ? 1 : 0;
+                        windowQueue.push(hit);
+                        windowCount += hit;
+                        if (windowQueue.length > WINDOW) {
+                            windowCount -= windowQueue.shift();
+                        }
+
+                        const dot = document.createElement('div');
+                        dot.className = 'timeline-dot';
+
+                        const intensity = Math.min(windowCount / 7, 1);
+                        if (intensity === 0) {
+                            dot.style.background = '#222';
+                        } else {
+                            const baseColor = catColors[cat];
+                            const r = parseInt(baseColor.slice(1,3), 16);
+                            const g = parseInt(baseColor.slice(3,5), 16);
+                            const b = parseInt(baseColor.slice(5,7), 16);
+                            const alpha = 0.2 + intensity * 0.8;
+                            dot.style.background = `rgba(${r},${g},${b},${alpha})`;
+                        }
+                        dot.title = `${key}: ${windowCount} in last ${WINDOW} days`;
+
+                        if (new Date(key).getDate() === 1 && [0, 3, 6, 9].includes(new Date(key).getMonth())) {
+                            dot.classList.add('quarter-line');
+                        }
+                        dotsDiv.appendChild(dot);
+                    }
+
+                    row.appendChild(dotsDiv);
+                    container.appendChild(row);
+                });
+            });
+        })();
+
+        // ===== 3. WEEKLY VOLUME (stacked bar) =====
+        (function() {
+            const weeks = Object.keys(weeklyVolume).sort();
+            const categories = ['strength', 'isometric', 'skill', 'fitness', 'flexibility'];
+
+            const datasets = categories.map(cat => ({
+                label: cat.charAt(0).toUpperCase() + cat.slice(1),
+                data: weeks.map(w => weeklyVolume[w][cat] || 0),
+                backgroundColor: catColors[cat],
+                borderRadius: 2,
+            }));
+
+            new Chart(document.getElementById('weeklyChart'), {
+                type: 'bar',
+                data: { labels: weeks, datasets },
+                options: {
+                    responsive: true,
+                    scales: {
+                        x: { stacked: true, ticks: { maxTicksLimit: 12, font: { size: 10 } },
+                             grid: { display: false } },
+                        y: { stacked: true, grid: { color: '#222' } }
+                    },
+                    plugins: {
+                        legend: { position: 'bottom', labels: { boxWidth: 12, padding: 12 } }
+                    }
+                }
+            });
+        })();
+
+        // ===== 4. CATEGORY BALANCE (donut) =====
+        (function() {
+            const categories = Object.keys(categoryDist);
+            const values = categories.map(c => categoryDist[c]);
+            const colors = categories.map(c => catColors[c]);
+
+            new Chart(document.getElementById('categoryChart'), {
+                type: 'doughnut',
+                data: {
+                    labels: categories.map(c => c.charAt(0).toUpperCase() + c.slice(1)),
+                    datasets: [{
+                        data: values,
+                        backgroundColor: colors,
+                        borderWidth: 0,
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    cutout: '55%',
+                    plugins: {
+                        legend: { position: 'bottom', labels: { boxWidth: 12, padding: 8 } }
+                    }
+                }
+            });
+        })();
+
+        // ===== 5. MONTHLY SUMMARY =====
+        (function() {
+            const months = monthlyVolume.map(m => m.month);
+            const counts = monthlyVolume.map(m => m.count);
+            const maxMonth = monthlyVolume.reduce((a, b) => a.count > b.count ? a : b, {count: 0});
+
+            const bgColors = counts.map((c, i) =>
+                monthlyVolume[i].month === maxMonth.month ? '#00d4ff' : 'rgba(0,212,255,0.4)');
+
+            new Chart(document.getElementById('monthlyChart'), {
+                type: 'bar',
+                data: {
+                    labels: months,
+                    datasets: [{
+                        label: 'Exercises',
+                        data: counts,
+                        backgroundColor: bgColors,
+                        borderRadius: 4,
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        x: { grid: { display: false }, ticks: { font: { size: 11 } } },
+                        y: { grid: { color: '#222' }, beginAtZero: true }
+                    },
+                    plugins: {
+                        legend: { display: false },
+                        subtitle: {
+                            display: maxMonth.month ? true : false,
+                            text: maxMonth.month ? `Best month: ${maxMonth.month} (${maxMonth.count} exercises)` : '',
+                            color: '#00d4ff', font: { size: 13 }, padding: { bottom: 10 }
+                        }
+                    }
+                }
+            });
+        })();
+
+        // ===== 6. PROGRESS CHARTS =====
+        (function() {
+            const grid = document.getElementById('progressGrid');
+            const exMap = {};
+            exercises.forEach(ex => exMap[ex.code] = ex);
+
+            Object.keys(progressData).sort().forEach(code => {
+                const data = progressData[code];
+                const ex = exMap[code];
+                if (!ex) return;
+
+                const card = document.createElement('div');
+                card.className = 'progress-card';
+
+                const unitLabel = data.input_type === 'distance' ? 'km' :
+                                  data.input_type === 'reps_sets' ? 'total reps' : 'total seconds';
+
+                card.innerHTML = `<h3>${ex.code} — ${ex.name} <span style="color:#888;font-weight:400;font-size:0.75rem;">(${unitLabel})</span></h3>
+                                  <canvas id="prog-${code}" height="160"></canvas>`;
+                grid.appendChild(card);
+
+                const values = data.values;
+                const windowSize = Math.max(3, Math.floor(values.length / 5));
+                const trend = values.map((v, i) => {
+                    const start = Math.max(0, i - windowSize + 1);
+                    const slice = values.slice(start, i + 1);
+                    return slice.reduce((a, b) => a + b, 0) / slice.length;
+                });
+
+                new Chart(document.getElementById(`prog-${code}`), {
+                    type: 'line',
+                    data: {
+                        labels: data.dates,
+                        datasets: [
+                            {
+                                label: unitLabel,
+                                data: values,
+                                borderColor: catColors[ex.category],
+                                backgroundColor: catColorsBg[ex.category],
+                                fill: true,
+                                tension: 0.3,
+                                pointRadius: 2,
+                                pointHoverRadius: 5,
+                                borderWidth: 2,
+                            },
+                            {
+                                label: 'Trend',
+                                data: trend,
+                                borderColor: '#00d4ff',
+                                borderDash: [5, 3],
+                                pointRadius: 0,
+                                borderWidth: 1.5,
+                                fill: false,
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        scales: {
+                            x: { display: false },
+                            y: { grid: { color: '#222' }, beginAtZero: false }
+                        },
+                        plugins: {
+                            legend: { display: false }
+                        }
+                    }
+                });
+            });
+
+            if (Object.keys(progressData).length === 0) {
+                grid.innerHTML = '<p style="color:#666;">No exercises with enough data points yet.</p>';
+            }
+        })();
+
+        // Scroll all horizontal containers to show most recent data
+        document.querySelectorAll('.heatmap-container, .timeline-container').forEach(el => {
+            el.scrollLeft = el.scrollWidth;
+        });
     </script>
 </body>
 </html>

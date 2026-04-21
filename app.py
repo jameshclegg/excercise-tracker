@@ -329,6 +329,9 @@ def index():
 
     cur.close()
     conn.close()
+
+    stats_data = _compute_stats_data()
+
     return render_template(
         "index.html",
         exercises=exercises,
@@ -338,6 +341,7 @@ def index():
         next_date=next_date,
         recent_dates=recent_dates,
         input_types=INPUT_TYPES,
+        **stats_data,
     )
 
 
@@ -440,18 +444,17 @@ def api_exercises():
     return jsonify(exercises)
 
 
-@app.route("/stats")
-@require_login
-def stats():
+def _compute_stats_data():
+    """Compute all stats data. Returns a dict of template variables."""
+    from collections import defaultdict
+
     conn = get_db()
     cur = conn.cursor(cursor_factory=RealDictCursor)
 
-    # All exercises
     cur.execute("SELECT code, name, category, input_type FROM exercises ORDER BY category, code")
     exercises = cur.fetchall()
     exercise_map = {e["code"]: e for e in exercises}
 
-    # All entries with exercise info
     cur.execute("""
         SELECT e.date, e.exercise_code, e.sets, e.weight,
                ex.name, ex.category, ex.input_type
@@ -461,7 +464,6 @@ def stats():
     """)
     all_entries = cur.fetchall()
 
-    # Daily counts for heatmap (last 12 months)
     cur.execute("""
         SELECT date, COUNT(*) as count
         FROM entries
@@ -470,7 +472,6 @@ def stats():
     """)
     daily_counts = {r["date"].isoformat(): r["count"] for r in cur.fetchall()}
 
-    # Daily exercise names for heatmap tooltips
     cur.execute("""
         SELECT e.date, ex.code, ex.name
         FROM entries e
@@ -487,7 +488,6 @@ def stats():
         if label not in daily_exercises[d]:
             daily_exercises[d].append(label)
 
-    # Weekly volume by category
     cur.execute("""
         SELECT TO_CHAR(e.date, 'IYYY-IW') as year_week,
                MIN(e.date) as week_start,
@@ -506,14 +506,12 @@ def stats():
             weekly_volume[wk] = {}
         weekly_volume[wk][r["category"]] = r["count"]
 
-    # Monthly volume
     cur.execute("""
         SELECT TO_CHAR(date, 'YYYY-MM') as month, COUNT(*) as count
         FROM entries GROUP BY month ORDER BY month
     """)
     monthly_volume = [{"month": r["month"], "count": r["count"]} for r in cur.fetchall()]
 
-    # Category distribution
     cur.execute("""
         SELECT ex.category, COUNT(*) as count
         FROM entries e JOIN exercises ex ON e.exercise_code = ex.code
@@ -521,7 +519,6 @@ def stats():
     """)
     category_dist = {r["category"]: r["count"] for r in cur.fetchall()}
 
-    # Per-exercise stats
     cur.execute("""
         SELECT e.exercise_code, ex.name, ex.category, ex.input_type,
                COUNT(*) as total_count,
@@ -537,7 +534,6 @@ def stats():
     cur.close()
     conn.close()
 
-    # Build timeline data: for each exercise, list of dates
     timeline_data = {}
     for entry in all_entries:
         code = entry["exercise_code"]
@@ -545,7 +541,6 @@ def stats():
             timeline_data[code] = []
         timeline_data[code].append(entry["date"].isoformat())
 
-    # Build progress data: for exercises with sets data, track values over time
     progress_data = {}
     for entry in all_entries:
         code = entry["exercise_code"]
@@ -569,10 +564,8 @@ def stats():
         progress_data[code]["dates"].append(entry["date"].isoformat())
         progress_data[code]["values"].append(value)
 
-    # Filter progress data to exercises with 5+ data points
     progress_data = {k: v for k, v in progress_data.items() if len(v["dates"]) >= 5}
 
-    # Compute streaks and consistency scores
     today = date.today()
     exercise_stats = []
     for r in exercise_stats_raw:
@@ -580,7 +573,6 @@ def stats():
         dates_list = sorted(set(timeline_data.get(code, [])))
         date_objs = [date.fromisoformat(d) for d in dates_list]
 
-        # Current streak
         current_streak = 0
         if date_objs:
             check = date_objs[-1]
@@ -590,7 +582,6 @@ def stats():
                 check -= timedelta(days=1)
                 idx -= 1
 
-        # Longest streak
         longest_streak = 0
         if date_objs:
             streak = 1
@@ -616,11 +607,8 @@ def stats():
             "longest_streak": longest_streak,
         })
 
-    # Sort by days_since (most neglected first)
     exercise_stats.sort(key=lambda x: x["days_since"], reverse=True)
 
-    # Quarterly narratives
-    from collections import defaultdict
     quarterly_entries = defaultdict(list)
     for entry in all_entries:
         m = entry["date"].month
@@ -636,29 +624,24 @@ def stats():
         year, q_num = q_key.split("-Q")
         q_label = f"{quarter_labels[int(q_num)]} {year}"
 
-        # Count exercises and active days
         code_counts = defaultdict(int)
         active_days = set()
         for e in entries:
             code_counts[e["exercise_code"]] += 1
             active_days.add(e["date"])
 
-        # Top exercises
         top = sorted(code_counts.items(), key=lambda x: x[1], reverse=True)
         top_names = [f"{exercise_map[c]['name']} ({n}x)" for c, n in top[:7] if c in exercise_map]
 
-        # Category breakdown
         cat_counts = defaultdict(int)
         for e in entries:
             cat_counts[e["category"]] += 1
         dominant_cat = max(cat_counts.items(), key=lambda x: x[1])[0] if cat_counts else "none"
 
-        # New exercises this quarter (not in previous quarter)
         current_codes = set(code_counts.keys())
         new_exercises = current_codes - prev_quarter_codes if prev_quarter_codes else set()
         dropped = prev_quarter_codes - current_codes if prev_quarter_codes else set()
 
-        # Progress tracking for key exercises
         progress_notes = []
         q_month_prefixes = []
         q_int = int(q_num)
@@ -689,7 +672,6 @@ def stats():
                         f"{name} decreased from {first_val:.0f} to {last_val:.0f} {unit}"
                     )
 
-        # Build narrative
         parts = []
         parts.append(f"You trained on <strong>{len(active_days)}</strong> days with "
                      f"<strong>{len(entries)}</strong> total exercise entries.")
@@ -718,7 +700,6 @@ def stats():
 
         prev_quarter_codes = current_codes
 
-    # Personal bests
     personal_bests = []
     for entry in all_entries:
         code = entry["exercise_code"]
@@ -752,7 +733,6 @@ def stats():
             "date": entry["date"].isoformat(),
         })
 
-    # Keep only the best per exercise
     best_map = {}
     for pb in personal_bests:
         code = pb["code"]
@@ -760,21 +740,26 @@ def stats():
             best_map[code] = pb
     personal_bests = sorted(best_map.values(), key=lambda x: x["value"], reverse=True)
 
-    return render_template(
-        "stats.html",
-        exercises_json=json.dumps([dict(e) for e in exercises]),
-        daily_counts_json=json.dumps(daily_counts),
-        daily_exercises_json=json.dumps(daily_exercises),
-        timeline_json=json.dumps(timeline_data),
-        progress_json=json.dumps(progress_data),
-        category_dist_json=json.dumps(category_dist),
-        weekly_volume_json=json.dumps(weekly_volume),
-        monthly_volume_json=json.dumps(monthly_volume),
-        exercise_stats=exercise_stats,
-        personal_bests=personal_bests,
-        exercise_map=exercise_map,
-        monthly_narratives=quarterly_narratives,
-    )
+    return {
+        "exercises_json": json.dumps([dict(e) for e in exercises]),
+        "daily_counts_json": json.dumps(daily_counts),
+        "daily_exercises_json": json.dumps(daily_exercises),
+        "timeline_json": json.dumps(timeline_data),
+        "progress_json": json.dumps(progress_data),
+        "category_dist_json": json.dumps(category_dist),
+        "weekly_volume_json": json.dumps(weekly_volume),
+        "monthly_volume_json": json.dumps(monthly_volume),
+        "exercise_stats": exercise_stats,
+        "personal_bests": personal_bests,
+        "exercise_map": exercise_map,
+        "monthly_narratives": quarterly_narratives,
+    }
+
+
+@app.route("/stats")
+@require_login
+def stats():
+    return render_template("stats.html", **_compute_stats_data())
 
 
 init_db()
