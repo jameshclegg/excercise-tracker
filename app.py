@@ -302,7 +302,7 @@ def index():
     exercises = cur.fetchall()
     exercise_map = {e["code"]: e for e in exercises}
 
-    selected_date = request.args.get("date", "2025-01-03")
+    selected_date = request.args.get("date", date.today().isoformat())
 
     cur.execute(
         """
@@ -349,7 +349,7 @@ def mobile():
     cur.execute("SELECT * FROM exercises ORDER BY code")
     exercises = cur.fetchall()
 
-    selected_date = request.args.get("date", "2025-01-03")
+    selected_date = request.args.get("date", date.today().isoformat())
 
     cur.execute(
         """
