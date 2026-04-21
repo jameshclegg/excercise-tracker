@@ -16,11 +16,34 @@ Commands during entry:
 """
 
 import sys
+import os
+import atexit
 from datetime import date, timedelta
 from collections import OrderedDict
 
 START_DATE = date(2025, 1, 3)
 DEFAULT_FILE = "data.txt"
+LOCK_SUFFIX = ".lock"
+
+
+def acquire_lock(filepath):
+    """Create a lock file to prevent concurrent instances."""
+    lockfile = filepath + LOCK_SUFFIX
+    if os.path.exists(lockfile):
+        print(f"ERROR: Another instance appears to be running (lock file exists: {lockfile})")
+        print("If no other instance is running, delete the lock file and try again.")
+        sys.exit(1)
+    with open(lockfile, "w") as f:
+        f.write(str(os.getpid()))
+    atexit.register(release_lock, lockfile)
+
+
+def release_lock(lockfile):
+    """Remove the lock file."""
+    try:
+        os.remove(lockfile)
+    except OSError:
+        pass
 
 
 def load_data(filepath):
@@ -93,6 +116,7 @@ Commands:
 
 def main():
     filepath = sys.argv[1] if len(sys.argv) > 1 else DEFAULT_FILE
+    acquire_lock(filepath)
     data = load_data(filepath)
 
     current_date = find_resume_date(data)
