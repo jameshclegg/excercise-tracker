@@ -764,6 +764,11 @@
                 grid.innerHTML = '<p style="color:#666;">No exercises with enough data points yet.</p>';
             }
         })();
+
+        // Scroll all horizontal containers to show most recent data
+        document.querySelectorAll('.heatmap-container, .timeline-container').forEach(el => {
+            el.scrollLeft = el.scrollWidth;
+        });
     </script>
 </body>
 </html>
