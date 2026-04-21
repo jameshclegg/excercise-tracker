@@ -455,6 +455,96 @@ def stats():
     # Sort by days_since (most neglected first)
     exercise_stats.sort(key=lambda x: x["days_since"], reverse=True)
 
+    # Monthly narratives
+    from collections import defaultdict
+    monthly_entries = defaultdict(list)
+    for entry in all_entries:
+        month_key = entry["date"].strftime("%Y-%m")
+        monthly_entries[month_key].append(entry)
+
+    monthly_narratives = []
+    prev_month_codes = set()
+    for month_key in sorted(monthly_entries.keys()):
+        entries = monthly_entries[month_key]
+        month_label = datetime.strptime(month_key, "%Y-%m").strftime("%B %Y")
+
+        # Count exercises and active days
+        code_counts = defaultdict(int)
+        active_days = set()
+        for e in entries:
+            code_counts[e["exercise_code"]] += 1
+            active_days.add(e["date"])
+
+        # Top exercises
+        top = sorted(code_counts.items(), key=lambda x: x[1], reverse=True)
+        top_names = [f"{exercise_map[c]['name']} ({n}x)" for c, n in top[:5] if c in exercise_map]
+
+        # Category breakdown
+        cat_counts = defaultdict(int)
+        for e in entries:
+            cat_counts[e["category"]] += 1
+        dominant_cat = max(cat_counts.items(), key=lambda x: x[1])[0] if cat_counts else "none"
+
+        # New exercises this month (not in previous month)
+        current_codes = set(code_counts.keys())
+        new_exercises = current_codes - prev_month_codes if prev_month_codes else set()
+        dropped = prev_month_codes - current_codes if prev_month_codes else set()
+
+        # Progress tracking for key exercises
+        progress_notes = []
+        for code in list(code_counts.keys()):
+            if code not in progress_data:
+                continue
+            pd = progress_data[code]
+            month_values = []
+            for d, v in zip(pd["dates"], pd["values"]):
+                if d.startswith(month_key):
+                    month_values.append(v)
+            if len(month_values) >= 2:
+                first_val = month_values[0]
+                last_val = month_values[-1]
+                if last_val > first_val * 1.1:
+                    unit = "km" if pd["input_type"] == "distance" else "reps" if pd["input_type"] == "reps_sets" else "sec"
+                    name = exercise_map[code]["name"] if code in exercise_map else code
+                    progress_notes.append(
+                        f"{name} improved from {first_val:.0f} to {last_val:.0f} {unit}"
+                    )
+                elif last_val < first_val * 0.9:
+                    unit = "km" if pd["input_type"] == "distance" else "reps" if pd["input_type"] == "reps_sets" else "sec"
+                    name = exercise_map[code]["name"] if code in exercise_map else code
+                    progress_notes.append(
+                        f"{name} decreased from {first_val:.0f} to {last_val:.0f} {unit}"
+                    )
+
+        # Build narrative
+        parts = []
+        parts.append(f"You trained on <strong>{len(active_days)}</strong> days with "
+                     f"<strong>{len(entries)}</strong> total exercise entries.")
+        parts.append(f"Most focus was on <strong>{dominant_cat}</strong>. "
+                     f"Top exercises: {', '.join(top_names)}.")
+
+        if new_exercises:
+            new_names = [exercise_map[c]["name"] for c in new_exercises if c in exercise_map]
+            if new_names:
+                parts.append(f"🆕 Started: {', '.join(sorted(new_names)[:5])}.")
+        if dropped:
+            drop_names = [exercise_map[c]["name"] for c in dropped if c in exercise_map]
+            if drop_names and len(drop_names) <= 8:
+                parts.append(f"⏸️ Paused: {', '.join(sorted(drop_names)[:5])}.")
+
+        if progress_notes:
+            parts.append("📈 " + ". ".join(progress_notes[:3]) + ".")
+
+        monthly_narratives.append({
+            "month": month_key,
+            "label": month_label,
+            "narrative": " ".join(parts),
+            "active_days": len(active_days),
+            "total_entries": len(entries),
+        })
+
+        prev_month_codes = current_codes
+
     # Personal bests
     personal_bests = []
     for entry in all_entries:
@@ -509,6 +599,7 @@ def stats():
         exercise_stats=exercise_stats,
         personal_bests=personal_bests,
         exercise_map=exercise_map,
+        monthly_narratives=monthly_narratives,
     )
 
 

@@ -80,6 +80,16 @@
 
         /* Charts */
         .chart-row { display: grid; grid-template-columns: 2fr 1fr; gap: 1.5rem; }
+
+        /* Monthly stories */
+        .monthly-stories { display: flex; flex-direction: column; gap: 1rem; }
+        .story-month { background: #0f3460; border-radius: 10px; padding: 1rem 1.2rem;
+                       border-left: 4px solid #00d4ff; }
+        .story-header { display: flex; justify-content: space-between; align-items: center;
+                        margin-bottom: 0.5rem; }
+        .story-month-label { font-weight: 700; font-size: 1.05rem; color: #00d4ff; }
+        .story-stats { font-size: 0.8rem; color: #888; }
+        .story-text { font-size: 0.9rem; line-height: 1.6; color: #ccc; }
         @media (max-width: 768px) {
             .chart-row { grid-template-columns: 1fr; }
             .progress-grid { grid-template-columns: 1fr; }
@@ -155,6 +165,22 @@
         <div class="card">
             <h2>📆 Monthly Summary</h2>
             <canvas id="monthlyChart"></canvas>
+        </div>
+
+        <!-- 4b. Monthly Story -->
+        <div class="card">
+            <h2>📖 Your Training Story</h2>
+            <div class="monthly-stories">
+                {% for m in monthly_narratives|reverse %}
+                <div class="story-month">
+                    <div class="story-header">
+                        <span class="story-month-label">{{ m.label }}</span>
+                        <span class="story-stats">{{ m.active_days }} days · {{ m.total_entries }} entries</span>
+                    </div>
+                    <p class="story-text">{{ m.narrative|safe }}</p>
+                </div>
+                {% endfor %}
+            </div>
         </div>
 
         <!-- 5. Progress Charts -->
