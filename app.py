@@ -56,7 +56,7 @@ CODE_ALIASES = {
     "dq": "SQ", "gm": "GM", "gr": "GR",
 }
 SUFFIX_ALIASES = {
-    "b*": "Bs", "r*": "Rs", "w*": "WW", "e'": "Ex",
+    "b*": "Bs", "r*": "Rs", "s*": "SP", "w*": "WW", "e'": "Ex",
     "t*": "PP", "v*": "VG", "g*": "GF",
 }
 

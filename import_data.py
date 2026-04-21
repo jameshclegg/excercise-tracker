@@ -41,6 +41,7 @@ CODE_ALIASES = {
 SUFFIX_ALIASES = {
     "b*": "Bs",
     "r*": "Rs",
+    "s*": "SP",
     "w*": "WW",
     "e'": "Ex",
     "t*": "PP",
