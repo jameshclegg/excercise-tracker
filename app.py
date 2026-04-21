@@ -50,6 +50,144 @@ CODE_INPUT_OVERRIDES = {
     "E": "time_sets",
 }
 
+# Code aliases for bulk entry parsing
+CODE_ALIASES = {
+    "hiit": "HH", "climbing": "CC", "climb": "CC",
+    "dq": "SQ", "gm": "GM", "gr": "GR",
+}
+SUFFIX_ALIASES = {
+    "b*": "Bs", "r*": "Rs", "w*": "WW", "e'": "Ex",
+    "t*": "PP", "v*": "VG", "g*": "GF",
+}
+
+
+def get_valid_codes():
+    """Get set of valid exercise codes from DB."""
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("SELECT code FROM exercises")
+    codes = {row[0] for row in cur.fetchall()}
+    cur.close()
+    conn.close()
+    return codes
+
+
+def normalize_code(raw_code, valid_codes):
+    """Normalize an exercise code to its canonical form."""
+    code = raw_code.strip()
+    lower = code.lower()
+    if lower in CODE_ALIASES:
+        return CODE_ALIASES[lower]
+    if lower in SUFFIX_ALIASES:
+        return SUFFIX_ALIASES[lower]
+    for valid in valid_codes:
+        if valid.lower() == lower:
+            return valid
+    return code
+
+
+def smart_split(codes_str):
+    """Split exercise entries by comma, keeping 'v a,b,c' together."""
+    result = []
+    remaining = codes_str
+    while remaining:
+        remaining = remaining.strip()
+        if not remaining:
+            break
+        v_match = re.match(r'^(v\s+[a-e](?:\s*,\s*[a-e])*)', remaining, re.IGNORECASE)
+        if v_match:
+            result.append(v_match.group(1))
+            remaining = remaining[v_match.end():].lstrip()
+            if remaining.startswith(','):
+                remaining = remaining[1:]
+            continue
+        comma_idx = remaining.find(',')
+        if comma_idx == -1:
+            result.append(remaining)
+            break
+        else:
+            result.append(remaining[:comma_idx])
+            remaining = remaining[comma_idx + 1:]
+    return result
+
+
+def parse_bulk_entry(raw_entry, valid_codes):
+    """
+    Parse a single exercise entry like 'p -13 5 4', 'a 1', 'vb', 'hiit'.
+    Returns list of (code, sets_str, weight, notes) tuples.
+    """
+    raw = raw_entry.strip()
+    if not raw:
+        return []
+
+    # Handle 'v a,b,c' patterns
+    v_match = re.match(r'^v\s+([a-e](?:\s*,\s*[a-e])*)\s*$', raw, re.IGNORECASE)
+    if v_match:
+        letters = re.findall(r'[a-eA-E]', v_match.group(1))
+        return [("V" + l.upper(), None, None, None) for l in letters]
+
+    # Handle bare 'v' or 'v 1'
+    if re.match(r'^v\s*$', raw, re.IGNORECASE) or re.match(r'^v\s+1\s*$', raw, re.IGNORECASE):
+        return [("VA", None, None, None), ("VB", None, None, None),
+                ("VC", None, None, None), ("VD", None, None, None),
+                ("VE", None, None, None)]
+
+    parts = raw.split()
+    code = normalize_code(parts[0], valid_codes)
+    rest = parts[1:]
+
+    if not rest:
+        return [(code, None, None, None)]
+
+    sets_str = None
+    weight = None
+    notes = None
+    i = 0
+
+    # Weight (negative number)
+    if i < len(rest) and rest[i].startswith('-'):
+        try:
+            weight = abs(float(rest[i]))
+            i += 1
+        except ValueError:
+            pass
+
+    # Fraction like '2/3'
+    if i < len(rest) and '/' in rest[i] and not rest[i].startswith('-'):
+        notes = f"{rest[i]} of routine"
+        return [(code, None, weight, notes)]
+
+    # Sets/reps value
+    if i < len(rest):
+        val = rest[i]
+        if '+' in val:
+            sets_str = val
+            i += 1
+        else:
+            try:
+                num = float(val)
+                i += 1
+                if i < len(rest):
+                    try:
+                        set_count = int(rest[i])
+                        i += 1
+                        if num == int(num):
+                            sets_str = "+".join([str(int(num))] * set_count)
+                        else:
+                            sets_str = "+".join([str(num)] * set_count)
+                    except ValueError:
+                        sets_str = str(int(num)) if num == int(num) else str(num)
+                else:
+                    sets_str = str(int(num)) if num == int(num) else str(num)
+            except ValueError:
+                pass
+
+    # Fraction after numbers
+    if i < len(rest) and '/' in rest[i]:
+        notes = f"{rest[i]} of routine"
+
+    return [(code, sets_str, weight, notes)]
+
 
 def get_db():
     conn = psycopg2.connect(DATABASE_URL)
@@ -242,25 +380,34 @@ def mobile():
 @app.route("/add", methods=["POST"])
 @require_login
 def add_entry():
-    exercise_code = request.form.get("exercise_code", "").strip()
+    bulk_text = request.form.get("bulk", "").strip()
     entry_date = request.form.get("date", date.today().isoformat())
-    sets_val = request.form.get("sets", "").strip() or None
-    weight = request.form.get("weight")
-    notes = request.form.get("notes", "").strip() or None
 
-    weight = float(weight) if weight else None
-
-    conn = get_db()
-    cur = conn.cursor()
-    cur.execute(
-        """
-        INSERT INTO entries (date, exercise_code, sets, weight, notes)
-        VALUES (%s, %s, %s, %s, %s)
-        """,
-        (entry_date, exercise_code, sets_val, weight, notes),
-    )
-    cur.close()
-    conn.close()
+    if bulk_text:
+        valid_codes = get_valid_codes()
+        raw_entries = smart_split(bulk_text)
+        conn = get_db()
+        cur = conn.cursor()
+        errors = []
+        count = 0
+        for raw in raw_entries:
+            parsed = parse_bulk_entry(raw, valid_codes)
+            for code, sets_str, weight, notes in parsed:
+                if code not in valid_codes:
+                    errors.append(f"Unknown code: {code}")
+                    continue
+                cur.execute(
+                    "INSERT INTO entries (date, exercise_code, sets, weight, notes) "
+                    "VALUES (%s, %s, %s, %s, %s)",
+                    (entry_date, code, sets_str, weight, notes),
+                )
+                count += 1
+        cur.close()
+        conn.close()
+        if errors:
+            flash(f"Added {count} entries. Errors: {'; '.join(errors)}")
+        elif count > 0:
+            flash(f"Added {count} entries")
 
     redirect_to = request.form.get("redirect", "/")
     next_date = (date.fromisoformat(entry_date) + timedelta(days=1)).isoformat()

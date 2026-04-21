@@ -79,35 +79,24 @@
     </div>
 
     <div class="add-form">
-        <h2>Add Exercise</h2>
+        <h2>Add Exercises</h2>
         <form method="POST" action="/add" id="addForm">
             <input type="hidden" name="date" value="{{ selected_date }}">
             <input type="hidden" name="redirect" value="/m">
-            <div class="form-group" style="position:relative;">
-                <label>Exercise (type code)</label>
-                <input type="text" id="codeInput" autocomplete="off" placeholder="e.g. P, SQ...">
-                <input type="hidden" name="exercise_code" id="exerciseCode" required>
-                <div id="dropdown" style="display:none; position:absolute; top:100%; left:0; right:0;
-                     background:#0f3460; border:1px solid #333; border-radius:0 0 8px 8px;
-                     max-height:200px; overflow-y:auto; z-index:10;">
-                </div>
-            </div>
-            <div class="num-row" id="numRow">
-                <div class="form-group" id="setsGroup" style="display:none">
-                    <label id="setsLabel">Sets</label>
-                    <input type="text" name="sets" id="setsInput" placeholder="e.g. 15+12+10">
-                </div>
-                <div class="form-group" id="weightGroup" style="display:none">
-                    <label>Weight (kg)</label>
-                    <input type="number" name="weight" id="weightInput" step="0.5" min="0">
-                </div>
-            </div>
             <div class="form-group">
-                <label>Notes</label>
-                <input type="text" name="notes" placeholder="Optional">
+                <label>Exercises (comma-separated)</label>
+                <input type="text" name="bulk" id="bulkInput" autocomplete="off"
+                       placeholder="p 15+12+10, d 45 3, a 1">
             </div>
             <button type="submit" class="add-btn">Add</button>
         </form>
+        {% with messages = get_flashed_messages() %}
+        {% if messages %}
+        <div style="margin-top:0.5rem; color:#2ecc71; font-size:0.85rem;">
+            {% for msg in messages %}{{ msg }}{% endfor %}
+        </div>
+        {% endif %}
+        {% endwith %}
     </div>
 
     <div class="entries">
@@ -153,103 +142,6 @@
     </div>
 
     <script>
-        const inputTypes = {{ input_types|tojson }};
-        const exercises = {{ exercises|tojson }};
-        const codeInput = document.getElementById('codeInput');
-        const exerciseCode = document.getElementById('exerciseCode');
-        const dropdown = document.getElementById('dropdown');
-        let activeIdx = -1;
-
-        function updateNumFields(inputType) {
-            const fields = inputTypes[inputType] || {};
-            const setsGroup = document.getElementById('setsGroup');
-            const setsInput = document.getElementById('setsInput');
-            const setsLabel = document.getElementById('setsLabel');
-            const weightGroup = document.getElementById('weightGroup');
-            const weightInput = document.getElementById('weightInput');
-
-            if (fields['sets']) {
-                setsGroup.style.display = '';
-                setsLabel.textContent = fields['sets'];
-                setsInput.required = true;
-            } else {
-                setsGroup.style.display = 'none';
-                setsInput.value = '';
-                setsInput.required = false;
-            }
-            if (fields['weight']) {
-                weightGroup.style.display = '';
-            } else {
-                weightGroup.style.display = 'none';
-                weightInput.value = '';
-            }
-        }
-
-        function selectExercise(ex) {
-            codeInput.value = ex.code + ' — ' + ex.name;
-            exerciseCode.value = ex.code;
-            dropdown.style.display = 'none';
-            updateNumFields(ex.input_type);
-            var firstField = document.querySelector('#setsGroup:not([style*="display: none"]) input, #setsGroup:not([style*="display:none"]) input');
-            if (firstField) firstField.focus();
-        }
-
-        function showDropdown(filter) {
-            const val = filter.toUpperCase();
-            const matches = val === '' ? exercises : exercises.filter(function(ex) {
-                return ex.code.toUpperCase().startsWith(val) ||
-                       ex.name.toUpperCase().includes(val);
-            });
-            dropdown.innerHTML = '';
-            activeIdx = -1;
-            if (matches.length === 0) { dropdown.style.display = 'none'; return; }
-            matches.forEach(function(ex) {
-                const div = document.createElement('div');
-                div.className = 'dropdown-item';
-                div.innerHTML = '<span class="code">' + ex.code + '</span> — ' + ex.name +
-                                '<span class="cat">' + ex.category + '</span>';
-                div.addEventListener('mousedown', function(e) {
-                    e.preventDefault();
-                    selectExercise(ex);
-                });
-                dropdown.appendChild(div);
-            });
-            dropdown.style.display = 'block';
-        }
-
-        codeInput.addEventListener('input', function() {
-            exerciseCode.value = '';
-            showDropdown(this.value.trim());
-        });
-
-        codeInput.addEventListener('focus', function() {
-            if (!exerciseCode.value) showDropdown(this.value.trim());
-        });
-
-        codeInput.addEventListener('blur', function() {
-            setTimeout(function() { dropdown.style.display = 'none'; }, 150);
-        });
-
-        codeInput.addEventListener('keydown', function(e) {
-            const items = dropdown.querySelectorAll('.dropdown-item');
-            if (e.key === 'ArrowDown') {
-                e.preventDefault();
-                activeIdx = Math.min(activeIdx + 1, items.length - 1);
-                items.forEach(function(el, i) { el.classList.toggle('active', i === activeIdx); });
-                if (items[activeIdx]) items[activeIdx].scrollIntoView({block: 'nearest'});
-            } else if (e.key === 'ArrowUp') {
-                e.preventDefault();
-                activeIdx = Math.max(activeIdx - 1, 0);
-                items.forEach(function(el, i) { el.classList.toggle('active', i === activeIdx); });
-            } else if (e.key === 'Enter' && activeIdx >= 0 && items.length > 0) {
-                e.preventDefault();
-                const val = codeInput.value.trim().toUpperCase();
-                const matches = val === '' ? exercises : exercises.filter(function(ex) {
-                    return ex.code.toUpperCase().startsWith(val) || ex.name.toUpperCase().includes(val);
-                });
-                if (matches[activeIdx]) selectExercise(matches[activeIdx]);
-            }
-        });
     </script>
 </body>
 </html>
