@@ -41,7 +41,7 @@
         .timeline-label { width: 140px; min-width: 140px; font-size: 0.8rem; padding-right: 8px;
                           white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .timeline-dots { display: flex; gap: 1px; flex: 1; }
-        .timeline-dot { width: 3px; height: 14px; border-radius: 1px; }
+        .timeline-dot { width: 2px; height: 14px; border-radius: 1px; }
         .timeline-dot.quarter-line { border-left: 1px solid #555; margin-left: 2px; padding-left: 2px; }
         .timeline-category-header { font-size: 0.75rem; font-weight: 700; padding: 6px 0 2px;
                                      text-transform: uppercase; letter-spacing: 1px; }
@@ -360,8 +360,16 @@
         (function() {
             const container = document.getElementById('timeline');
             const today = new Date();
-            const startDate = new Date(today);
-            startDate.setFullYear(startDate.getFullYear() - 1);
+            // Find earliest date across all timeline data
+            let earliest = today;
+            Object.values(timelineData).forEach(dates => {
+                dates.forEach(d => {
+                    const dt = new Date(d);
+                    if (dt < earliest) earliest = dt;
+                });
+            });
+            const startDate = new Date(earliest);
+            startDate.setDate(1); // round down to start of month
 
             const totalDays = Math.ceil((today - startDate) / 86400000);
 
