@@ -470,6 +470,23 @@ def stats():
     """)
     daily_counts = {r["date"].isoformat(): r["count"] for r in cur.fetchall()}
 
+    # Daily exercise names for heatmap tooltips
+    cur.execute("""
+        SELECT e.date, ex.code, ex.name
+        FROM entries e
+        JOIN exercises ex ON e.exercise_code = ex.code
+        WHERE e.date >= CURRENT_DATE - INTERVAL '12 months'
+        ORDER BY e.date, ex.name
+    """)
+    daily_exercises = {}
+    for r in cur.fetchall():
+        d = r["date"].isoformat()
+        if d not in daily_exercises:
+            daily_exercises[d] = []
+        label = f"{r['code']} ({r['name']})"
+        if label not in daily_exercises[d]:
+            daily_exercises[d].append(label)
+
     # Weekly volume by category
     cur.execute("""
         SELECT TO_CHAR(e.date, 'IYYY-IW') as year_week,
@@ -747,6 +764,7 @@ def stats():
         "stats.html",
         exercises_json=json.dumps([dict(e) for e in exercises]),
         daily_counts_json=json.dumps(daily_counts),
+        daily_exercises_json=json.dumps(daily_exercises),
         timeline_json=json.dumps(timeline_data),
         progress_json=json.dumps(progress_data),
         category_dist_json=json.dumps(category_dist),

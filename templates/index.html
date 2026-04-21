@@ -77,32 +77,22 @@
         </div>
     </div>
 
-    <!-- Date selector -->
-    <div class="date-nav">
-        <form method="GET" style="display:flex; gap:8px; align-items:center;">
-            <input type="date" name="date" value="{{ selected_date }}">
-            <button type="submit">Go</button>
-        </form>
-        <a href="/?date={{ next_date }}" style="padding:8px 16px; background:#0f3460; border-radius:8px; font-weight:600;">+1 Day</a>
-    </div>
-
-    {% if recent_dates %}
-    <div class="recent-dates">
-        {% for d in recent_dates %}
-        <a href="/?date={{ d }}" class="{{ 'active' if d == selected_date }}">{{ d }}</a>
-        {% endfor %}
-    </div>
-    {% endif %}
-
     <!-- Add entry -->
     <div class="add-form">
         <h2>Add Exercises</h2>
         <form method="POST" action="/add" id="addForm">
-            <input type="hidden" name="date" value="{{ selected_date }}">
             <input type="hidden" name="redirect" value="/">
-            <div class="form-row">
+            <div class="form-row" style="align-items:flex-end;">
+                <div class="form-group" style="flex:0 0 auto;">
+                    <label>Date</label>
+                    <div style="display:flex; gap:6px; align-items:center;">
+                        <input type="date" id="dateInput" name="date" value="{{ selected_date }}"
+                               onchange="document.getElementById('dateGo').click()">
+                        <a href="/?date={{ next_date }}" style="padding:6px 12px; background:#0f3460; border-radius:6px; font-weight:600; color:#00d4ff; text-decoration:none; white-space:nowrap;">+1</a>
+                    </div>
+                </div>
                 <div class="form-group" style="flex:1;">
-                    <label>Exercises (comma-separated, e.g. "p -13 5 4, a 1, vb, hiit")</label>
+                    <label>Exercises (comma-separated, e.g. "p -13 5 4, a 1, vb")</label>
                     <input type="text" name="bulk" id="bulkInput" autocomplete="off"
                            placeholder="p 15+12+10, d 45 3, j 3.2, a 1" autofocus
                            style="width:100%;">
@@ -110,6 +100,17 @@
                 <button type="submit" class="add-btn">Add</button>
             </div>
         </form>
+        <!-- Hidden form for date navigation -->
+        <form method="GET" id="dateForm" style="display:none;">
+            <input type="hidden" name="date" id="dateHidden">
+            <button type="submit" id="dateGo"></button>
+        </form>
+        <script>
+            document.getElementById('dateInput').addEventListener('change', function() {
+                document.getElementById('dateHidden').value = this.value;
+                document.getElementById('dateGo').click();
+            });
+        </script>
         {% with messages = get_flashed_messages() %}
         {% if messages %}
         <div style="margin-top:0.5rem; color:#2ecc71; font-size:0.85rem;">

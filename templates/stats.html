@@ -267,6 +267,7 @@
 
     <script>
         const dailyCounts = {{ daily_counts_json|safe }};
+        const dailyExercises = {{ daily_exercises_json|safe }};
         const timelineData = {{ timeline_json|safe }};
         const progressData = {{ progress_json|safe }};
         const categoryDist = {{ category_dist_json|safe }};
@@ -327,7 +328,8 @@
                         const key = d.toISOString().split('T')[0];
                         const count = dailyCounts[key] || 0;
                         dayDiv.style.background = getColor(count);
-                        dayDiv.title = `${key}: ${count} exercise${count !== 1 ? 's' : ''}`;
+                        const exList = dailyExercises[key] || [];
+                        dayDiv.title = exList.length ? `${key}:\n${exList.join('\n')}` : `${key}: Rest day`;
                     } else {
                         dayDiv.style.background = 'transparent';
                     }

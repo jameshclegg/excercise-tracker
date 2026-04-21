@@ -70,19 +70,18 @@
     </div>
     <h1>🏋️ Exercise Tracker</h1>
 
-    <form method="GET" class="date-nav">
-        <input type="date" name="date" value="{{ selected_date }}">
-        <button type="submit">Go</button>
-    </form>
-    <div style="margin-bottom:1rem; text-align:center;">
-        <a href="/m?date={{ next_date }}" style="display:inline-block; padding:10px 24px; background:#0f3460; border-radius:8px; font-weight:600; color:#00d4ff;">+1 Day</a>
-    </div>
-
     <div class="add-form">
         <h2>Add Exercises</h2>
         <form method="POST" action="/add" id="addForm">
-            <input type="hidden" name="date" value="{{ selected_date }}">
             <input type="hidden" name="redirect" value="/m">
+            <div class="form-group">
+                <label>Date</label>
+                <div style="display:flex; gap:6px; align-items:center;">
+                    <input type="date" id="dateInput" name="date" value="{{ selected_date }}"
+                           style="flex:1;">
+                    <a href="/m?date={{ next_date }}" style="padding:8px 16px; background:#0f3460; border-radius:8px; font-weight:600; color:#00d4ff; text-decoration:none;">+1</a>
+                </div>
+            </div>
             <div class="form-group">
                 <label>Exercises (comma-separated)</label>
                 <input type="text" name="bulk" id="bulkInput" autocomplete="off"
@@ -90,6 +89,17 @@
             </div>
             <button type="submit" class="add-btn">Add</button>
         </form>
+        <!-- Hidden form for date navigation -->
+        <form method="GET" id="dateForm" style="display:none;">
+            <input type="hidden" name="date" id="dateHidden">
+            <button type="submit" id="dateGo"></button>
+        </form>
+        <script>
+            document.getElementById('dateInput').addEventListener('change', function() {
+                document.getElementById('dateHidden').value = this.value;
+                document.getElementById('dateGo').click();
+            });
+        </script>
         {% with messages = get_flashed_messages() %}
         {% if messages %}
         <div style="margin-top:0.5rem; color:#2ecc71; font-size:0.85rem;">
