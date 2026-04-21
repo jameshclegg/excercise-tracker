@@ -289,11 +289,16 @@ def import_to_db(days, dry_run=False):
     cur = conn.cursor()
 
     try:
-        # Clear existing entries (idempotent import)
-        cur.execute("DELETE FROM entries")
-        deleted = cur.rowcount
-        if deleted:
-            print(f"  Cleared {deleted} existing entries.")
+        # Only delete entries for dates in data.txt, preserving web-entered data
+        dates_to_import = list(days.keys())
+        if dates_to_import:
+            cur.execute(
+                "DELETE FROM entries WHERE date = ANY(%s::date[])",
+                (dates_to_import,),
+            )
+            deleted = cur.rowcount
+            if deleted:
+                print(f"  Cleared {deleted} existing entries for {len(dates_to_import)} dates in data.txt.")
 
         for date_str, entries in days.items():
             for code, sets_str, weight, notes in entries:
