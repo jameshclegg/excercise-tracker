@@ -115,6 +115,10 @@ Commands:
 
 
 def main():
+    if len(sys.argv) > 1 and sys.argv[1] in ("--help", "-h"):
+        print(__doc__)
+        sys.exit(0)
+
     filepath = sys.argv[1] if len(sys.argv) > 1 else DEFAULT_FILE
     acquire_lock(filepath)
     data = load_data(filepath)
@@ -190,6 +194,7 @@ def main():
                 del data[ds]
             print(f"  Deleted: {removed}")
             print_day(ds, data)
+            save_data(filepath, data)
 
         else:
             # Treat as exercise code
@@ -198,8 +203,9 @@ def main():
                 data[ds] = []
             data[ds].append(raw)
             print(f"  Added: {raw}")
+            save_data(filepath, data)
 
-    # Auto-save on exit
+    # Final save on exit (redundant but safe)
     save_data(filepath, data)
     print(f"Saved to {filepath}.")
 
