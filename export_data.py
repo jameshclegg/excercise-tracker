@@ -14,7 +14,7 @@ def get_db():
     return psycopg2.connect(os.environ["DATABASE_URL"])
 
 
-def export_data(output_file="data_export.txt"):
+def export_data(output_file="data/data_export.txt"):
     conn = get_db()
     cur = conn.cursor()
     cur.execute("""
@@ -62,7 +62,7 @@ def export_data(output_file="data_export.txt"):
     if note_rows:
         notes_file = output_file.replace("data_export", "notes_export").replace("data.txt", "notes.txt")
         if notes_file == output_file:
-            notes_file = "notes_export.txt"
+            notes_file = "data/notes_export.txt"
         with open(notes_file, "w") as f:
             for code, name, notes_text in note_rows:
                 f.write(f"[{code}] {name}\n")
@@ -75,5 +75,5 @@ def export_data(output_file="data_export.txt"):
 
 
 if __name__ == "__main__":
-    output = sys.argv[1] if len(sys.argv) > 1 else "data_export.txt"
+    output = sys.argv[1] if len(sys.argv) > 1 else "data/data_export.txt"
     export_data(output)

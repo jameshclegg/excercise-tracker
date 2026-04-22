@@ -22,7 +22,7 @@ from datetime import date, timedelta
 from collections import OrderedDict
 
 START_DATE = date(2025, 1, 3)
-DEFAULT_FILE = "data.txt"
+DEFAULT_FILE = "data/data.txt"
 LOCK_SUFFIX = ".lock"
 
 

@@ -22,12 +22,12 @@ jobs:
       - name: Export data from Neon
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
-        run: uv run python export_data.py data_export.txt
+        run: uv run python export_data.py data/data_export.txt
 
       - name: Commit and push if changed
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add data_export.txt notes_export.txt
+          git add data/data_export.txt data/notes_export.txt
           git diff --staged --quiet || git commit -m "Sync exercise data $(date -u +%Y-%m-%d)"
           git push

@@ -26,7 +26,7 @@ app.secret_key = os.environ.get("SECRET_KEY", "dev-secret")
 DATABASE_URL = os.environ["DATABASE_URL"]
 PASSWORD_HASH = os.environ.get("TIMELINE_PASSWORD", "")
 
-EXERCISES_FILE = os.path.join(os.path.dirname(__file__), "exercises.txt")
+EXERCISES_FILE = os.path.join(os.path.dirname(__file__), "data", "exercises.txt")
 
 # Input type determines which fields are shown in the UI
 INPUT_TYPES = {
