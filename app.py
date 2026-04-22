@@ -203,9 +203,17 @@ def init_db():
             code TEXT PRIMARY KEY,
             name TEXT NOT NULL,
             category TEXT NOT NULL,
-            input_type TEXT NOT NULL
+            input_type TEXT NOT NULL,
+            body_area TEXT
         )
     """)
+    # Migrate: add body_area column if missing
+    cur.execute("""
+        SELECT column_name FROM information_schema.columns
+        WHERE table_name = 'exercises' AND column_name = 'body_area'
+    """)
+    if not cur.fetchone():
+        cur.execute("ALTER TABLE exercises ADD COLUMN body_area TEXT")
     # Migrate: drop old schema if it has num1/num2/num3 columns
     cur.execute("""
         SELECT column_name FROM information_schema.columns
@@ -239,29 +247,31 @@ def parse_exercises_file():
             line = line.strip()
             if not line or line.startswith("#"):
                 continue
-            m = re.match(r"^(\S+)\s*=\s*(.+?)\s*\[(\w+)\]\s*$", line)
+            m = re.match(r"^(\S+)\s*=\s*(.+?)\s*\[(\w+)\](?:\s*\{(\w+)\})?\s*$", line)
             if m:
                 code, name, category = m.group(1), m.group(2).strip(), m.group(3)
+                body_area = m.group(4)  # None if not specified
                 input_type = CODE_INPUT_OVERRIDES.get(
                     code, CATEGORY_DEFAULT_INPUT.get(category, "none")
                 )
-                exercises.append((code, name, category, input_type))
+                exercises.append((code, name, category, input_type, body_area))
     return exercises
 
 
 def seed_exercises(cur):
     exercises = parse_exercises_file()
-    for code, name, category, input_type in exercises:
+    for code, name, category, input_type, body_area in exercises:
         cur.execute(
             """
-            INSERT INTO exercises (code, name, category, input_type)
-            VALUES (%s, %s, %s, %s)
+            INSERT INTO exercises (code, name, category, input_type, body_area)
+            VALUES (%s, %s, %s, %s, %s)
             ON CONFLICT (code) DO UPDATE SET
                 name = EXCLUDED.name,
                 category = EXCLUDED.category,
-                input_type = EXCLUDED.input_type
+                input_type = EXCLUDED.input_type,
+                body_area = EXCLUDED.body_area
             """,
-            (code, name, category, input_type),
+            (code, name, category, input_type, body_area),
         )
 
 
