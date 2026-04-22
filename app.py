@@ -693,7 +693,7 @@ def _compute_stats_data():
             "longest_streak": longest_streak,
         })
 
-    exercise_stats.sort(key=lambda x: x["days_since"], reverse=True)
+    exercise_stats.sort(key=lambda x: x["days_since"], reverse=False)
 
     quarterly_entries = defaultdict(list)
     for entry in all_entries:

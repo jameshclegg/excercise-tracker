@@ -252,7 +252,7 @@
     </div>
     <script>
         async function lookupRecent(val) {
-            const code = val.trim().toUpperCase();
+            const code = val.trim();
             const container = document.getElementById('recentResults');
             if (!code) { container.innerHTML = ''; return; }
             try {
@@ -425,7 +425,7 @@
         <!-- 7. Consistency Scores -->
         <div class="card">
             <h2>📋 Consistency Scores</h2>
-            <p class="scroll-hint">Sorted by most neglected first</p>
+            <p class="scroll-hint">Sorted by least neglected first</p>
             <div style="overflow-x:auto;">
                 <table class="stats-table">
                     <thead>
