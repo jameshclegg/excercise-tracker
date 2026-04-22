@@ -434,7 +434,43 @@
 
             const categoryOrder = ['strength', 'isometric', 'skill', 'fitness', 'flexibility'];
 
-            // Render active exercises
+            const bodyArea = {
+                'P': 'back', 'WW': 'back', 'RR': 'back', 'Z': 'back',
+                'R': 'chest', 'Rs': 'chest', 'TT': 'chest',
+                'B': 'arms', 'Bs': 'arms', 'SQ': 'arms', 'T': 'arms', 'T3': 'arms', 'GM': 'arms', 'GR': 'arms',
+                'S': 'legs', 'SS': 'legs', 'SP': 'legs', 'M': 'legs',
+                'A': 'core', 'U': 'core', 'X': 'core',
+            };
+            const bodyAreaOrder = ['back', 'chest', 'arms', 'legs', 'core'];
+
+            function renderExRow(ex, cat, container, dimmed) {
+                const dates = new Set(timelineData[ex.code] || []);
+                const row = document.createElement('div');
+                row.className = 'timeline-row';
+                const label = document.createElement('div');
+                label.className = 'timeline-label';
+                if (dimmed) label.style.opacity = '0.5';
+                label.textContent = ex.code + ' — ' + ex.name;
+                label.title = ex.name;
+                row.appendChild(label);
+                const dotsDiv = document.createElement('div');
+                dotsDiv.className = 'timeline-dots';
+                for (let i = 0; i < totalDays; i++) {
+                    const d = new Date(startDate);
+                    d.setDate(d.getDate() + i);
+                    const key = d.toISOString().split('T')[0];
+                    const dot = document.createElement('div');
+                    dot.className = 'timeline-dot';
+                    dot.style.background = dates.has(key) ? catColors[cat] : (dimmed ? '#1a1a1a' : '#222');
+                    if (d.getDate() === 1 && [0, 3, 6, 9].includes(d.getMonth())) {
+                        dot.classList.add('quarter-line');
+                    }
+                    dotsDiv.appendChild(dot);
+                }
+                row.appendChild(dotsDiv);
+                container.appendChild(row);
+            }
+
             categoryOrder.forEach(cat => {
                 const exList = byCategory[cat];
                 if (!exList || exList.length === 0) return;
@@ -445,39 +481,32 @@
                 header.textContent = cat.toUpperCase();
                 container.appendChild(header);
 
-                exList.forEach(ex => {
-                    const dates = new Set(timelineData[ex.code] || []);
-                    const row = document.createElement('div');
-                    row.className = 'timeline-row';
-
-                    const label = document.createElement('div');
-                    label.className = 'timeline-label';
-                    label.textContent = ex.code + ' — ' + ex.name;
-                    label.title = ex.name;
-                    row.appendChild(label);
-
-                    const dotsDiv = document.createElement('div');
-                    dotsDiv.className = 'timeline-dots';
-
-                    for (let i = 0; i < totalDays; i++) {
-                        const d = new Date(startDate);
-                        d.setDate(d.getDate() + i);
-                        const key = d.toISOString().split('T')[0];
-                        const dot = document.createElement('div');
-                        dot.className = 'timeline-dot';
-                        dot.style.background = dates.has(key) ? catColors[cat] : '#222';
-                        if (d.getDate() === 1 && [0, 3, 6, 9].includes(d.getMonth())) {
-                            dot.classList.add('quarter-line');
+                if (cat === 'strength') {
+                    const byArea = {};
+                    const noArea = [];
+                    exList.forEach(ex => {
+                        const area = bodyArea[ex.code];
+                        if (area) {
+                            if (!byArea[area]) byArea[area] = [];
+                            byArea[area].push(ex);
+                        } else {
+                            noArea.push(ex);
                         }
-                        dotsDiv.appendChild(dot);
-                    }
-
-                    row.appendChild(dotsDiv);
-                    container.appendChild(row);
-                });
+                    });
+                    bodyAreaOrder.forEach(area => {
+                        if (!byArea[area] || byArea[area].length === 0) return;
+                        const subHeader = document.createElement('div');
+                        subHeader.style.cssText = 'font-size:0.65rem; color:#666; padding:3px 0 1px 8px; text-transform:uppercase; letter-spacing:1px;';
+                        subHeader.textContent = area;
+                        container.appendChild(subHeader);
+                        byArea[area].forEach(ex => renderExRow(ex, cat, container, false));
+                    });
+                    noArea.forEach(ex => renderExRow(ex, cat, container, false));
+                } else {
+                    exList.forEach(ex => renderExRow(ex, cat, container, false));
+                }
             });
 
-            // Render dormant section
             const hasDormant = Object.values(dormantByCategory).some(l => l.length > 0);
             if (hasDormant) {
                 const sep = document.createElement('div');
@@ -491,38 +520,7 @@
                 categoryOrder.forEach(cat => {
                     const exList = dormantByCategory[cat];
                     if (!exList || exList.length === 0) return;
-
-                    exList.forEach(ex => {
-                        const dates = new Set(timelineData[ex.code] || []);
-                        const row = document.createElement('div');
-                        row.className = 'timeline-row';
-
-                        const label = document.createElement('div');
-                        label.className = 'timeline-label';
-                        label.style.opacity = '0.5';
-                        label.textContent = ex.code + ' — ' + ex.name;
-                        label.title = ex.name;
-                        row.appendChild(label);
-
-                        const dotsDiv = document.createElement('div');
-                        dotsDiv.className = 'timeline-dots';
-
-                        for (let i = 0; i < totalDays; i++) {
-                            const d = new Date(startDate);
-                            d.setDate(d.getDate() + i);
-                            const key = d.toISOString().split('T')[0];
-                            const dot = document.createElement('div');
-                            dot.className = 'timeline-dot';
-                            dot.style.background = dates.has(key) ? catColors[cat] : '#1a1a1a';
-                            if (d.getDate() === 1 && [0, 3, 6, 9].includes(d.getMonth())) {
-                                dot.classList.add('quarter-line');
-                            }
-                            dotsDiv.appendChild(dot);
-                        }
-
-                        row.appendChild(dotsDiv);
-                        container.appendChild(row);
-                    });
+                    exList.forEach(ex => renderExRow(ex, cat, container, true));
                 });
             }
         })();
