@@ -23,8 +23,6 @@ def export_data(output_file="data_export.txt"):
         ORDER BY date, id
     """)
     rows = cur.fetchall()
-    cur.close()
-    conn.close()
 
     days = OrderedDict()
     for row_date, code, sets_str, weight, notes in rows:
@@ -49,6 +47,31 @@ def export_data(output_file="data_export.txt"):
             f.write(f"{date_str}: {', '.join(entries)}\n")
 
     print(f"Exported {len(rows)} entries across {len(days)} days to {output_file}")
+
+    # Export exercise notes
+    cur.execute("""
+        SELECT en.exercise_code, e.name, en.notes
+        FROM exercise_notes en
+        JOIN exercises e ON en.exercise_code = e.code
+        ORDER BY en.exercise_code
+    """)
+    note_rows = cur.fetchall()
+    cur.close()
+    conn.close()
+
+    if note_rows:
+        notes_file = output_file.replace("data_export", "notes_export").replace("data.txt", "notes.txt")
+        if notes_file == output_file:
+            notes_file = "notes_export.txt"
+        with open(notes_file, "w") as f:
+            for code, name, notes_text in note_rows:
+                f.write(f"[{code}] {name}\n")
+                for line in notes_text.split("\n"):
+                    f.write(f"  {line}\n")
+                f.write("\n")
+        print(f"Exported {len(note_rows)} exercise notes to {notes_file}")
+    else:
+        print("No exercise notes to export")
 
 
 if __name__ == "__main__":

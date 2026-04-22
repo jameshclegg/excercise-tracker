@@ -284,6 +284,26 @@
             <div class="timeline-container" id="densityTimeline"></div>
         </div>
 
+        <!-- Exercise Notes -->
+        <div class="card">
+            <h2>📝 Exercise Notes</h2>
+            <div style="display:flex; gap:10px; align-items:flex-start; flex-wrap:wrap;">
+                <select id="noteExercise" style="padding:8px; background:#1a1a2e; color:#eee; border:1px solid #333; border-radius:4px; min-width:200px;">
+                    <option value="">Select exercise…</option>
+                    {% for ex in exercises %}
+                    <option value="{{ ex.code }}">{{ ex.code }} — {{ ex.name }}</option>
+                    {% endfor %}
+                </select>
+                <div style="flex:1; min-width:300px;">
+                    <textarea id="noteText" rows="4" style="width:100%; padding:8px; background:#1a1a2e; color:#eee; border:1px solid #333; border-radius:4px; font-family:inherit; resize:vertical;" placeholder="Select an exercise to view/edit notes…"></textarea>
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-top:6px;">
+                        <span id="noteSaveStatus" style="font-size:0.8rem; color:#666;"></span>
+                        <button id="noteSaveBtn" onclick="saveNote()" style="padding:6px 16px; background:#00b4d8; color:#000; border:none; border-radius:4px; cursor:pointer; font-weight:bold;" disabled>Save</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- 3. Weekly Volume + Category Balance -->
         <div class="chart-row">
             <div class="card">
@@ -961,6 +981,60 @@
         document.querySelectorAll('.heatmap-container, .timeline-container').forEach(el => {
             el.scrollLeft = el.scrollWidth;
         });
+
+        // ===== Exercise Notes =====
+        const notesCache = {};
+        (async function loadNotes() {
+            try {
+                const resp = await fetch('/api/notes');
+                const notes = await resp.json();
+                notes.forEach(n => { notesCache[n.exercise_code] = n.notes; });
+            } catch(e) { console.error('Failed to load notes', e); }
+        })();
+
+        document.getElementById('noteExercise').addEventListener('change', function() {
+            const code = this.value;
+            const textarea = document.getElementById('noteText');
+            const btn = document.getElementById('noteSaveBtn');
+            const status = document.getElementById('noteSaveStatus');
+            if (code) {
+                textarea.value = notesCache[code] || '';
+                textarea.placeholder = 'Add notes about ' + code + '…';
+                btn.disabled = false;
+                status.textContent = notesCache[code] ? 'Last saved note loaded' : '';
+            } else {
+                textarea.value = '';
+                textarea.placeholder = 'Select an exercise to view/edit notes…';
+                btn.disabled = true;
+                status.textContent = '';
+            }
+        });
+
+        async function saveNote() {
+            const code = document.getElementById('noteExercise').value;
+            const notes = document.getElementById('noteText').value.trim();
+            const status = document.getElementById('noteSaveStatus');
+            if (!code) return;
+            try {
+                const resp = await fetch('/api/notes', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({exercise_code: code, notes: notes})
+                });
+                if (resp.ok) {
+                    if (notes) { notesCache[code] = notes; } else { delete notesCache[code]; }
+                    status.textContent = 'Saved ✓';
+                    status.style.color = '#0f0';
+                    setTimeout(() => { status.style.color = '#666'; }, 2000);
+                } else {
+                    status.textContent = 'Error saving';
+                    status.style.color = '#f44';
+                }
+            } catch(e) {
+                status.textContent = 'Error saving';
+                status.style.color = '#f44';
+            }
+        }
     </script>
 </body>
 </html>

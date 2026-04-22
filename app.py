@@ -235,6 +235,13 @@ def init_db():
     cur.execute("""
         CREATE INDEX IF NOT EXISTS idx_entries_date ON entries(date)
     """)
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS exercise_notes (
+            exercise_code TEXT PRIMARY KEY REFERENCES exercises(code),
+            notes TEXT NOT NULL DEFAULT '',
+            updated_at TIMESTAMPTZ DEFAULT NOW()
+        )
+    """)
     seed_exercises(cur)
     cur.close()
     conn.close()
@@ -451,6 +458,44 @@ def api_exercises():
     cur.close()
     conn.close()
     return jsonify(exercises)
+
+
+@app.route("/api/notes", methods=["GET"])
+@require_login
+def api_get_notes():
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    cur.execute("SELECT exercise_code, notes, updated_at FROM exercise_notes ORDER BY exercise_code")
+    notes = cur.fetchall()
+    cur.close()
+    conn.close()
+    return jsonify(notes)
+
+
+@app.route("/api/notes", methods=["POST"])
+@require_login
+def api_save_note():
+    data = request.get_json()
+    code = data.get("exercise_code", "").strip()
+    notes_text = data.get("notes", "").strip()
+    if not code:
+        return jsonify({"error": "exercise_code required"}), 400
+
+    conn = get_db()
+    cur = conn.cursor()
+    if notes_text:
+        cur.execute("""
+            INSERT INTO exercise_notes (exercise_code, notes, updated_at)
+            VALUES (%s, %s, NOW())
+            ON CONFLICT (exercise_code) DO UPDATE SET
+                notes = EXCLUDED.notes,
+                updated_at = NOW()
+        """, (code, notes_text))
+    else:
+        cur.execute("DELETE FROM exercise_notes WHERE exercise_code = %s", (code,))
+    cur.close()
+    conn.close()
+    return jsonify({"ok": True})
 
 
 def _compute_stats_data():
