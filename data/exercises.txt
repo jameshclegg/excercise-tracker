@@ -23,6 +23,7 @@ J = run [fitness]
 K = plank [isometric]
 L = L-sit hanging [isometric]
 M = one-leg squat [strength] {legs}
+MU = muscle up [strength] {back}
 N = side-side hip mobility [flexibility]
 P = Pull-up [strength] {back}
 PP = planche progression [skill]
