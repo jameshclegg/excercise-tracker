@@ -498,6 +498,38 @@ def api_save_note():
     return jsonify({"ok": True})
 
 
+@app.route("/api/recent/<code>")
+@require_login
+def api_recent(code):
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    cur.execute("""
+        SELECT e.date, e.sets, e.weight, e.notes, ex.name, ex.input_type
+        FROM entries e
+        JOIN exercises ex ON e.exercise_code = ex.code
+        WHERE e.exercise_code = %s
+        ORDER BY e.date DESC, e.id DESC
+        LIMIT 10
+    """, (code,))
+    rows = cur.fetchall()
+    cur.close()
+    conn.close()
+    # Group by date (most recent 3 dates)
+    from collections import OrderedDict
+    by_date = OrderedDict()
+    for r in rows:
+        d = r["date"].isoformat()
+        if d not in by_date:
+            if len(by_date) >= 3:
+                break
+            by_date[d] = []
+        by_date[d].append({
+            "sets": r["sets"], "weight": float(r["weight"]) if r["weight"] else None,
+            "notes": r["notes"], "input_type": r["input_type"]
+        })
+    return jsonify({"name": rows[0]["name"] if rows else code, "dates": by_date})
+
+
 def _compute_stats_data():
     """Compute all stats data. Returns a dict of template variables."""
     from collections import defaultdict

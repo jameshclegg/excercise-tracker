@@ -235,6 +235,59 @@
         {% endif %}
     </div>
 
+    <!-- Recent History Lookup -->
+    <div class="card" style="margin:1.5rem auto; max-width:900px; padding:1rem 1.5rem;">
+        <h2>🔍 Recent History</h2>
+        <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+            <input type="text" id="recentSearch" list="exerciseList" placeholder="Type or select exercise…"
+                   style="padding:8px; background:#1a1a2e; color:#eee; border:1px solid #333; border-radius:4px; min-width:250px;"
+                   onchange="lookupRecent(this.value)" onkeydown="if(event.key==='Enter'){lookupRecent(this.value);event.preventDefault();}">
+            <datalist id="exerciseList">
+                {% for ex in exercises %}
+                <option value="{{ ex.code }}">{{ ex.code }} — {{ ex.name }}</option>
+                {% endfor %}
+            </datalist>
+        </div>
+        <div id="recentResults" style="margin-top:10px;"></div>
+    </div>
+    <script>
+        async function lookupRecent(val) {
+            const code = val.trim().toUpperCase();
+            const container = document.getElementById('recentResults');
+            if (!code) { container.innerHTML = ''; return; }
+            try {
+                const resp = await fetch('/api/recent/' + encodeURIComponent(code));
+                if (!resp.ok) { container.innerHTML = '<p style="color:#f44;">Exercise not found</p>'; return; }
+                const data = await resp.json();
+                const dates = Object.keys(data.dates);
+                if (dates.length === 0) {
+                    container.innerHTML = '<p style="color:#888;">No entries found for ' + code + '</p>';
+                    return;
+                }
+                let html = '<p style="color:#00d4ff; font-weight:600; margin-bottom:8px;">' + code + ' — ' + data.name + '</p>';
+                dates.forEach(d => {
+                    html += '<div style="background:#1a1a2e; border-radius:6px; padding:8px 12px; margin-bottom:6px;">';
+                    html += '<strong style="color:#ccc;">' + d + '</strong>';
+                    data.dates[d].forEach(e => {
+                        html += '<span style="margin-left:12px; color:#aaa;">';
+                        if (e.sets) {
+                            if (e.input_type === 'distance') html += e.sets + ' km';
+                            else if (e.input_type === 'reps_sets') html += e.sets + ' reps' + (e.weight ? ' @ ' + e.weight + 'kg' : '');
+                            else if (e.input_type === 'time_sets') html += e.sets + 's' + (e.weight ? ' @ ' + e.weight + 'kg' : '');
+                            else html += e.sets;
+                        } else { html += '✓ Done'; }
+                        if (e.notes) html += ' <span style="color:#666;">(' + e.notes + ')</span>';
+                        html += '</span>';
+                    });
+                    html += '</div>';
+                });
+                container.innerHTML = html;
+            } catch(err) {
+                container.innerHTML = '<p style="color:#f44;">Error loading data</p>';
+            }
+        }
+    </script>
+
     <!-- Stats Section -->
     <hr class="stats-separator">
     <div class="dashboard">
