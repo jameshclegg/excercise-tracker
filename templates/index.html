@@ -302,6 +302,10 @@
                     </div>
                 </div>
             </div>
+            <div style="margin-top:10px;">
+                <button id="toggleAllNotes" onclick="toggleAllNotes()" style="padding:6px 16px; background:#333; color:#eee; border:1px solid #555; border-radius:4px; cursor:pointer;">View All Notes</button>
+            </div>
+            <div id="allNotesDisplay" style="display:none; margin-top:12px;"></div>
         </div>
 
         <!-- 3. Weekly Volume + Category Balance -->
@@ -1033,6 +1037,34 @@
             } catch(e) {
                 status.textContent = 'Error saving';
                 status.style.color = '#f44';
+            }
+        }
+
+        function toggleAllNotes() {
+            const container = document.getElementById('allNotesDisplay');
+            const btn = document.getElementById('toggleAllNotes');
+            if (container.style.display === 'none') {
+                const exerciseList = {{ exercises | tojson }};
+                const exMap = {};
+                exerciseList.forEach(e => { exMap[e.code] = e.name; });
+                const codes = Object.keys(notesCache).sort();
+                if (codes.length === 0) {
+                    container.innerHTML = '<p style="color:#888;">No notes yet.</p>';
+                } else {
+                    container.innerHTML = codes.map(code => {
+                        const name = exMap[code] || code;
+                        const text = notesCache[code].replace(/</g, '&lt;').replace(/\n/g, '<br>');
+                        return `<div style="margin-bottom:12px; padding:8px 12px; background:#1a1a2e; border-left:3px solid #00b4d8; border-radius:4px;">
+                            <strong style="color:#00b4d8;">${code} — ${name}</strong><br>
+                            <span style="color:#ccc;">${text}</span>
+                        </div>`;
+                    }).join('');
+                }
+                container.style.display = 'block';
+                btn.textContent = 'Hide All Notes';
+            } else {
+                container.style.display = 'none';
+                btn.textContent = 'View All Notes';
             }
         }
     </script>
