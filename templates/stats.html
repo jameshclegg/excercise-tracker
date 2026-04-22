@@ -232,8 +232,6 @@
                             <th>Total</th>
                             <th>Last Done</th>
                             <th>Days Ago</th>
-                            <th>Current Streak</th>
-                            <th>Best Streak</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -252,12 +250,6 @@
                                     <span>{{ s.days_since }}d</span>
                                 </div>
                             </td>
-                            <td>
-                                {% if s.current_streak > 0 %}
-                                <span class="streak-badge" style="background:#2ecc7133;color:#2ecc71;">🔥 {{ s.current_streak }}d</span>
-                                {% else %}—{% endif %}
-                            </td>
-                            <td>{{ s.longest_streak }}d</td>
                         </tr>
                         {% endfor %}
                     </tbody>

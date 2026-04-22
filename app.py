@@ -667,26 +667,6 @@ def _compute_stats_data():
         dates_list = sorted(set(timeline_data.get(code, [])))
         date_objs = [date.fromisoformat(d) for d in dates_list]
 
-        current_streak = 0
-        if date_objs:
-            check = date_objs[-1]
-            idx = len(date_objs) - 1
-            while idx >= 0 and date_objs[idx] == check:
-                current_streak += 1
-                check -= timedelta(days=1)
-                idx -= 1
-
-        longest_streak = 0
-        if date_objs:
-            streak = 1
-            for i in range(1, len(date_objs)):
-                if (date_objs[i] - date_objs[i-1]).days == 1:
-                    streak += 1
-                else:
-                    longest_streak = max(longest_streak, streak)
-                    streak = 1
-            longest_streak = max(longest_streak, streak)
-
         days_since = (today - r["last_done"]).days
 
         exercise_stats.append({
@@ -697,8 +677,6 @@ def _compute_stats_data():
             "total_count": r["total_count"],
             "last_done": r["last_done"].isoformat(),
             "days_since": days_since,
-            "current_streak": current_streak,
-            "longest_streak": longest_streak,
         })
 
     exercise_stats.sort(key=lambda x: x["days_since"], reverse=False)
