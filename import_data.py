@@ -39,11 +39,11 @@ CODE_ALIASES = {
 
 # Suffix aliases (matched after stripping)
 SUFFIX_ALIASES = {
-    "b*": "Bs",
-    "r*": "Rs",
+    "b*": "BS",
+    "r*": "RS",
     "s*": "SP",
     "w*": "WW",
-    "e'": "Ex",
+    "e'": "EX",
     "t*": "PP",
     "v*": "VG",
     "g*": "GF",

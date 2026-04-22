@@ -56,7 +56,7 @@ CODE_ALIASES = {
     "dq": "SQ", "gm": "GM", "gr": "GR",
 }
 SUFFIX_ALIASES = {
-    "b*": "Bs", "r*": "Rs", "s*": "SP", "w*": "WW", "e'": "Ex",
+    "b*": "BS", "r*": "RS", "s*": "SP", "w*": "WW", "e'": "EX",
     "t*": "PP", "v*": "VG", "g*": "GF",
 }
 
@@ -242,6 +242,14 @@ def init_db():
             updated_at TIMESTAMPTZ DEFAULT NOW()
         )
     """)
+    # Migrate: rename mixed-case codes to uppercase
+    code_renames = [("Bs", "BS"), ("Rs", "RS"), ("Ex", "EX"), ("Gx", "GX"), ("Gy", "GY")]
+    for old, new in code_renames:
+        cur.execute("SELECT 1 FROM exercises WHERE code = %s", (old,))
+        if cur.fetchone():
+            cur.execute("UPDATE entries SET exercise_code = %s WHERE exercise_code = %s", (new, old))
+            cur.execute("UPDATE exercise_notes SET exercise_code = %s WHERE exercise_code = %s", (new, old))
+            cur.execute("DELETE FROM exercises WHERE code = %s", (old,))
     seed_exercises(cur)
     cur.close()
     conn.close()
