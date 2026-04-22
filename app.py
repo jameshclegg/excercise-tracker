@@ -460,7 +460,7 @@ def _compute_stats_data():
     conn = get_db()
     cur = conn.cursor(cursor_factory=RealDictCursor)
 
-    cur.execute("SELECT code, name, category, input_type FROM exercises ORDER BY category, code")
+    cur.execute("SELECT code, name, category, input_type, body_area FROM exercises ORDER BY category, code")
     exercises = cur.fetchall()
     exercise_map = {e["code"]: e for e in exercises}
 
