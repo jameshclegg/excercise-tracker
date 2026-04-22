@@ -335,7 +335,6 @@ def index():
     return render_template(
         "index.html",
         exercises=exercises,
-        exercise_map=exercise_map,
         entries=entries,
         selected_date=selected_date,
         next_date=next_date,
