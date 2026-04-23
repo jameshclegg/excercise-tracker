@@ -242,6 +242,13 @@ def init_db():
             updated_at TIMESTAMPTZ DEFAULT NOW()
         )
     """)
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS injury_notes (
+            id INTEGER PRIMARY KEY DEFAULT 1 CHECK (id = 1),
+            notes TEXT NOT NULL DEFAULT '',
+            updated_at TIMESTAMPTZ DEFAULT NOW()
+        )
+    """)
     # Migrate: rename mixed-case codes to uppercase
     code_renames = [("Bs", "BS"), ("Rs", "RS"), ("Ex", "EX"), ("Gx", "GX"), ("Gy", "GY")]
     for old, new in code_renames:
@@ -506,7 +513,35 @@ def api_save_note():
     return jsonify({"ok": True})
 
 
-@app.route("/api/recent/<code>")
+@app.route("/api/injury-notes", methods=["GET"])
+@require_login
+def api_get_injury_notes():
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("SELECT notes FROM injury_notes WHERE id = 1")
+    row = cur.fetchone()
+    cur.close()
+    conn.close()
+    return jsonify({"notes": row[0] if row else ""})
+
+
+@app.route("/api/injury-notes", methods=["POST"])
+@require_login
+def api_save_injury_notes():
+    data = request.get_json()
+    notes_text = data.get("notes", "").strip()
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("""
+        INSERT INTO injury_notes (id, notes, updated_at)
+        VALUES (1, %s, NOW())
+        ON CONFLICT (id) DO UPDATE SET
+            notes = EXCLUDED.notes,
+            updated_at = NOW()
+    """, (notes_text,))
+    cur.close()
+    conn.close()
+    return jsonify({"ok": True})
 @require_login
 def api_recent(code):
     conn = get_db()

@@ -56,8 +56,6 @@ def export_data(output_file="data/data_export.txt"):
         ORDER BY en.exercise_code
     """)
     note_rows = cur.fetchall()
-    cur.close()
-    conn.close()
 
     if note_rows:
         notes_file = output_file.replace("data_export", "notes_export").replace("data.txt", "notes.txt")
@@ -72,6 +70,22 @@ def export_data(output_file="data/data_export.txt"):
         print(f"Exported {len(note_rows)} exercise notes to {notes_file}")
     else:
         print("No exercise notes to export")
+
+    # Export injury notes
+    cur.execute("SELECT notes FROM injury_notes WHERE id = 1")
+    injury_row = cur.fetchone()
+    cur.close()
+    conn.close()
+
+    injury_file = "data/injury_notes.txt"
+    if injury_row and injury_row[0].strip():
+        with open(injury_file, "w") as f:
+            f.write(injury_row[0])
+            if not injury_row[0].endswith("\n"):
+                f.write("\n")
+        print(f"Exported injury notes to {injury_file}")
+    else:
+        print("No injury notes to export")
 
 
 if __name__ == "__main__":

@@ -361,6 +361,16 @@
             <div id="allNotesDisplay" style="display:none; margin-top:12px;"></div>
         </div>
 
+        <!-- Injury Notes -->
+        <div class="card">
+            <h2>🩹 Injury Notes</h2>
+            <textarea id="injuryText" rows="5" style="width:100%; padding:8px; background:#1a1a2e; color:#eee; border:1px solid #333; border-radius:4px; font-family:inherit; resize:vertical;" placeholder="Record any injuries, niggles, or things to watch out for…"></textarea>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-top:6px;">
+                <span id="injurySaveStatus" style="font-size:0.8rem; color:#666;"></span>
+                <button onclick="saveInjuryNotes()" style="padding:6px 16px; background:#00b4d8; color:#000; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">Save</button>
+            </div>
+        </div>
+
         <!-- 3. Weekly Volume + Category Balance -->
         <div class="chart-row">
             <div class="card">
@@ -1110,6 +1120,38 @@
             } else {
                 container.style.display = 'none';
                 btn.textContent = 'View All Notes';
+            }
+        }
+
+        // ===== Injury Notes =====
+        (async function loadInjuryNotes() {
+            try {
+                const resp = await fetch('/api/injury-notes');
+                const data = await resp.json();
+                document.getElementById('injuryText').value = data.notes || '';
+            } catch(e) { console.error('Failed to load injury notes', e); }
+        })();
+
+        async function saveInjuryNotes() {
+            const notes = document.getElementById('injuryText').value.trim();
+            const status = document.getElementById('injurySaveStatus');
+            try {
+                const resp = await fetch('/api/injury-notes', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({notes: notes})
+                });
+                if (resp.ok) {
+                    status.textContent = 'Saved ✓';
+                    status.style.color = '#0f0';
+                    setTimeout(() => { status.style.color = '#666'; status.textContent = ''; }, 2000);
+                } else {
+                    status.textContent = 'Error saving';
+                    status.style.color = '#f44';
+                }
+            } catch(e) {
+                status.textContent = 'Error saving';
+                status.style.color = '#f44';
             }
         }
     </script>
