@@ -1,0 +1,202 @@
+"""Telegram bot webhook route."""
+
+import json
+import re
+import urllib.request
+from datetime import date
+
+from flask import Blueprint, jsonify, request
+
+from ..config import TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID
+from ..db import get_db
+from ..parsing import get_valid_codes, parse_bulk_entry
+from ..plan import compute_plan_data
+
+bp = Blueprint("telegram", __name__)
+
+
+def telegram_reply(chat_id, text):
+    """Send a reply message via Telegram Bot API."""
+    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+    payload = json.dumps({"chat_id": chat_id, "text": text}).encode()
+    req = urllib.request.Request(url, data=payload,
+                                headers={"Content-Type": "application/json"})
+    try:
+        urllib.request.urlopen(req)
+    except Exception as e:
+        print(f"Telegram reply error: {e}")
+
+
+def parse_weight(text):
+    """Check if text is a weight entry: decimal between 60.0 and 99.9 with exactly 1 decimal place."""
+    m = re.match(r"^(\d{2}\.\d)$", text.strip())
+    if m:
+        val = float(m.group(1))
+        if 60.0 <= val <= 99.9:
+            return val
+    return None
+
+
+@bp.route("/telegram/webhook", methods=["POST"])
+def telegram_webhook():
+    if not TELEGRAM_BOT_TOKEN:
+        return jsonify({"ok": False, "error": "Bot not configured"}), 500
+
+    data = request.get_json(silent=True)
+    if not data or "message" not in data:
+        return jsonify({"ok": True})
+
+    message = data["message"]
+    chat_id = str(message.get("chat", {}).get("id", ""))
+    text = message.get("text", "").strip()
+
+    if not text:
+        return jsonify({"ok": True})
+
+    # Restrict to authorized user (if configured)
+    if TELEGRAM_CHAT_ID and chat_id != TELEGRAM_CHAT_ID:
+        return jsonify({"ok": True})  # silently ignore
+
+    # If chat ID not configured yet, echo it so user can set it up
+    if not TELEGRAM_CHAT_ID:
+        telegram_reply(chat_id, f"👋 Your chat ID is: {chat_id}\n"
+                       "Add this as TELEGRAM_CHAT_ID in your environment variables, "
+                       "then restart the app to lock the bot to your account.")
+        # Still process the message
+
+    # Handle bot commands
+    if text.startswith("/"):
+        lower = text.lower().strip()
+        if lower in ("/todo", "/todo@" + TELEGRAM_BOT_TOKEN.split(":")[0] if TELEGRAM_BOT_TOKEN else ""):
+            plan = compute_plan_data()
+            if not plan["todo_items"]:
+                telegram_reply(chat_id, "✅ All caught up! Nothing to do.")
+            else:
+                lines = ["📋 *To-Do*\n"]
+                for item in plan["todo_items"]:
+                    lines.append(f"  `{item['last_entry']}` — {item['name']} ({item['days_ago']}d ago)")
+                telegram_reply(chat_id, "\n".join(lines))
+            return jsonify({"ok": True})
+
+        if lower in ("/slipping", "/slipping@" + TELEGRAM_BOT_TOKEN.split(":")[0] if TELEGRAM_BOT_TOKEN else ""):
+            plan = compute_plan_data()
+            if not plan["slipping_items"]:
+                telegram_reply(chat_id, "👍 Nothing slipping!")
+            else:
+                lines = ["⚠️ *Slipping*\n"]
+                for item in plan["slipping_items"]:
+                    lines.append(f"  `{item['code']}` — {item['name']}")
+                telegram_reply(chat_id, "\n".join(lines))
+            return jsonify({"ok": True})
+
+        if lower in ("/plan",):
+            plan = compute_plan_data()
+            lines = []
+            if plan["todo_items"]:
+                lines.append("📋 *To-Do*\n")
+                for item in plan["todo_items"]:
+                    lines.append(f"  `{item['last_entry']}` — {item['name']} ({item['days_ago']}d ago)")
+            else:
+                lines.append("✅ All caught up!\n")
+            lines.append("")
+            if plan["slipping_items"]:
+                lines.append("⚠️ *Slipping*\n")
+                for item in plan["slipping_items"]:
+                    lines.append(f"  `{item['code']}` — {item['name']}")
+            else:
+                lines.append("👍 Nothing slipping!")
+            telegram_reply(chat_id, "\n".join(lines))
+            return jsonify({"ok": True})
+
+        # Default help for unknown commands
+        telegram_reply(chat_id, "👋 Exercise & Weight Tracker Bot\n\n"
+                       "Send a weight like: 64.4\n"
+                       "Or exercises like: p -13 5 4, a 1, vb\n\n"
+                       "Commands:\n"
+                       "/todo — exercises to do\n"
+                       "/slipping — exercises slipping\n"
+                       "/plan — both lists")
+        return jsonify({"ok": True})
+
+    # Check for /test suffix
+    test_mode = False
+    if text.lower().endswith("/test"):
+        test_mode = True
+        text = text[: -len("/test")].strip()
+
+    today_str = date.today().isoformat()
+    test_label = " [TEST MODE — not saved]" if test_mode else ""
+
+    # Try weight first
+    weight = parse_weight(text)
+    if weight is not None:
+        try:
+            conn = get_db()
+            conn.autocommit = False
+            cur = conn.cursor()
+            cur.execute(
+                "INSERT INTO weights (date, weight) VALUES (%s, %s) "
+                "ON CONFLICT (date) DO UPDATE SET weight = EXCLUDED.weight",
+                (today_str, weight),
+            )
+            if test_mode:
+                conn.rollback()
+            else:
+                conn.commit()
+            cur.close()
+            conn.close()
+            telegram_reply(chat_id, f"⚖️ Understood {weight} as weight {weight} kg.\n"
+                           f"Posted to weight tracker for {today_str}.{test_label}")
+        except Exception as e:
+            telegram_reply(chat_id, f"❌ Error saving weight: {e}")
+        return jsonify({"ok": True})
+
+    # Try exercise entry
+    try:
+        valid_codes = get_valid_codes()
+        parsed = parse_bulk_entry(text, valid_codes)
+        if not parsed:
+            telegram_reply(chat_id, "❓ I don't understand your input.\n\n"
+                           "Send a weight like: 64.4\n"
+                           "Or exercises like: p -13 5 4, a 1, vb")
+            return jsonify({"ok": True})
+
+        # Validate all codes exist
+        invalid = [code for code, _, _, _ in parsed if code not in valid_codes]
+        if invalid:
+            telegram_reply(chat_id, f"❓ Unknown exercise code(s): {', '.join(invalid)}\n\n"
+                           "Send a weight like: 64.4\n"
+                           "Or exercises like: p -13 5 4, a 1, vb")
+            return jsonify({"ok": True})
+
+        conn = get_db()
+        conn.autocommit = False
+        cur = conn.cursor()
+        summaries = []
+        for code, sets_str, weight_val, notes in parsed:
+            cur.execute(
+                "INSERT INTO entries (date, exercise_code, sets, weight, notes) "
+                "VALUES (%s, %s, %s, %s, %s)",
+                (today_str, code, sets_str, weight_val, notes),
+            )
+            parts = [code]
+            if sets_str:
+                parts.append(sets_str)
+            if weight_val:
+                parts.append(f"@ {weight_val}kg")
+            summaries.append(" ".join(parts))
+
+        if test_mode:
+            conn.rollback()
+        else:
+            conn.commit()
+        cur.close()
+        conn.close()
+
+        reply = f"🏋️ Posted {len(parsed)} exercise(s) for {today_str}:{test_label}\n"
+        reply += "\n".join(f"  • {s}" for s in summaries)
+        telegram_reply(chat_id, reply)
+    except Exception as e:
+        telegram_reply(chat_id, f"❌ Error saving exercises: {e}")
+
+    return jsonify({"ok": True})

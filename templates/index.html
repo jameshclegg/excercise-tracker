@@ -265,7 +265,7 @@
         {% for item in todo_items %}
         <div class="plan-item">
             <code>{{ item.last_entry }}</code>
-            <span class="plan-name">{{ item.name }} ({{ item.last_date }})</span>
+            <span class="plan-name">{{ item.name }} ({{ item.days_ago }}d ago)</span>
         </div>
         {% endfor %}
         {% else %}
