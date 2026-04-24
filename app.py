@@ -932,23 +932,35 @@ def telegram_webhook():
                        "then restart the app to lock the bot to your account.")
         # Still process the message
 
+    # Check for /test suffix
+    test_mode = False
+    if text.lower().endswith("/test"):
+        test_mode = True
+        text = text[: -len("/test")].strip()
+
     today_str = date.today().isoformat()
+    test_label = " [TEST MODE — not saved]" if test_mode else ""
 
     # Try weight first
     weight = parse_weight(text)
     if weight is not None:
         try:
             conn = get_db()
+            conn.autocommit = False
             cur = conn.cursor()
             cur.execute(
                 "INSERT INTO weights (date, weight) VALUES (%s, %s) "
                 "ON CONFLICT (date) DO UPDATE SET weight = EXCLUDED.weight",
                 (today_str, weight),
             )
+            if test_mode:
+                conn.rollback()
+            else:
+                conn.commit()
             cur.close()
             conn.close()
             telegram_reply(chat_id, f"⚖️ Understood {weight} as weight {weight} kg.\n"
-                           f"Posted to weight tracker for {today_str}.")
+                           f"Posted to weight tracker for {today_str}.{test_label}")
         except Exception as e:
             telegram_reply(chat_id, f"❌ Error saving weight: {e}")
         return jsonify({"ok": True})
@@ -972,6 +984,7 @@ def telegram_webhook():
             return jsonify({"ok": True})
 
         conn = get_db()
+        conn.autocommit = False
         cur = conn.cursor()
         summaries = []
         for code, sets_str, weight_val, notes in parsed:
@@ -986,10 +999,15 @@ def telegram_webhook():
             if weight_val:
                 parts.append(f"@ {weight_val}kg")
             summaries.append(" ".join(parts))
+
+        if test_mode:
+            conn.rollback()
+        else:
+            conn.commit()
         cur.close()
         conn.close()
 
-        reply = f"🏋️ Posted {len(parsed)} exercise(s) for {today_str}:\n"
+        reply = f"🏋️ Posted {len(parsed)} exercise(s) for {today_str}:{test_label}\n"
         reply += "\n".join(f"  • {s}" for s in summaries)
         telegram_reply(chat_id, reply)
     except Exception as e:
