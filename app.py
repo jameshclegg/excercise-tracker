@@ -913,17 +913,9 @@ def telegram_webhook():
     if not text:
         return jsonify({"ok": True})
 
-    # Handle bot commands
-    if text.startswith("/"):
-        telegram_reply(chat_id, "👋 Exercise & Weight Tracker Bot\n\n"
-                       "Send a weight like: 64.4\n"
-                       "Or exercises like: p -13 5 4, a 1, vb")
-        return jsonify({"ok": True})
-
     # Restrict to authorized user (if configured)
     if TELEGRAM_CHAT_ID and chat_id != TELEGRAM_CHAT_ID:
-        telegram_reply(chat_id, "⛔ Unauthorized. Your chat ID: " + chat_id)
-        return jsonify({"ok": True})
+        return jsonify({"ok": True})  # silently ignore
 
     # If chat ID not configured yet, echo it so user can set it up
     if not TELEGRAM_CHAT_ID:
@@ -931,6 +923,13 @@ def telegram_webhook():
                        "Add this as TELEGRAM_CHAT_ID in your environment variables, "
                        "then restart the app to lock the bot to your account.")
         # Still process the message
+
+    # Handle bot commands
+    if text.startswith("/"):
+        telegram_reply(chat_id, "👋 Exercise & Weight Tracker Bot\n\n"
+                       "Send a weight like: 64.4\n"
+                       "Or exercises like: p -13 5 4, a 1, vb")
+        return jsonify({"ok": True})
 
     # Check for /test suffix
     test_mode = False
