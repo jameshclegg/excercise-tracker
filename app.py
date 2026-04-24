@@ -913,6 +913,13 @@ def telegram_webhook():
     if not text:
         return jsonify({"ok": True})
 
+    # Handle bot commands
+    if text.startswith("/"):
+        telegram_reply(chat_id, "👋 Exercise & Weight Tracker Bot\n\n"
+                       "Send a weight like: 64.4\n"
+                       "Or exercises like: p -13 5 4, a 1, vb")
+        return jsonify({"ok": True})
+
     # Restrict to authorized user (if configured)
     if TELEGRAM_CHAT_ID and chat_id != TELEGRAM_CHAT_ID:
         telegram_reply(chat_id, "⛔ Unauthorized. Your chat ID: " + chat_id)
@@ -956,21 +963,28 @@ def telegram_webhook():
                            "Or exercises like: p -13 5 4, a 1, vb")
             return jsonify({"ok": True})
 
+        # Validate all codes exist
+        invalid = [code for code, _, _, _ in parsed if code not in valid_codes]
+        if invalid:
+            telegram_reply(chat_id, f"❓ Unknown exercise code(s): {', '.join(invalid)}\n\n"
+                           "Send a weight like: 64.4\n"
+                           "Or exercises like: p -13 5 4, a 1, vb")
+            return jsonify({"ok": True})
+
         conn = get_db()
         cur = conn.cursor()
         summaries = []
-        for entry in parsed:
+        for code, sets_str, weight_val, notes in parsed:
             cur.execute(
-                "INSERT INTO entries (date, exercise_code, sets, weight) "
-                "VALUES (%s, %s, %s, %s)",
-                (today_str, entry["code"], entry.get("sets"), entry.get("weight")),
+                "INSERT INTO entries (date, exercise_code, sets, weight, notes) "
+                "VALUES (%s, %s, %s, %s, %s)",
+                (today_str, code, sets_str, weight_val, notes),
             )
-            ex_name = entry["code"]
-            parts = [ex_name]
-            if entry.get("sets"):
-                parts.append(entry["sets"])
-            if entry.get("weight"):
-                parts.append(f"@ {entry['weight']}kg")
+            parts = [code]
+            if sets_str:
+                parts.append(sets_str)
+            if weight_val:
+                parts.append(f"@ {weight_val}kg")
             summaries.append(" ".join(parts))
         cur.close()
         conn.close()
