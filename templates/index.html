@@ -45,9 +45,28 @@
                    border-radius: 8px; font-weight: 600; cursor: pointer; align-self: flex-end; }
         .add-btn:hover { background: #00b8d9; }
 
+        /* Entries + Plan layout */
+        .entries-plan-row { display: flex; gap: 1.5rem; }
+        .entries-plan-row > .entries { flex: 1; min-width: 0; }
+        .entries-plan-row > .plan-panel { flex: 0 0 320px; }
+        @media (max-width: 900px) {
+            .entries-plan-row { flex-direction: column; }
+            .entries-plan-row > .plan-panel { flex: none; }
+        }
+
         /* Entries table */
         .entries { background: #16213e; border-radius: 12px; padding: 1.5rem; }
         .entries h2 { color: #00d4ff; margin-bottom: 1rem; font-size: 1.1rem; }
+
+        /* Plan panel */
+        .plan-panel { background: #16213e; border-radius: 12px; padding: 1.5rem; }
+        .plan-panel h2 { color: #00d4ff; margin-bottom: 1rem; font-size: 1.1rem; }
+        .plan-panel h3 { color: #f39c12; margin: 1rem 0 0.5rem 0; font-size: 0.95rem; }
+        .plan-panel h3:first-child { margin-top: 0; }
+        .plan-item { padding: 4px 0; font-size: 0.9rem; border-bottom: 1px solid #222; }
+        .plan-item code { background: #0d1b2a; padding: 2px 6px; border-radius: 4px;
+                          color: #00d4ff; font-size: 0.85rem; }
+        .plan-item .plan-name { color: #aaa; font-size: 0.8rem; }
         table { width: 100%; border-collapse: collapse; }
         th { text-align: left; padding: 8px 12px; color: #888; font-size: 0.85rem;
              border-bottom: 1px solid #333; }
@@ -187,6 +206,9 @@
         {% endwith %}
     </div>
 
+    <!-- Entries + Plan row -->
+    <div class="entries-plan-row">
+
     <!-- Entries for selected date -->
     <div class="entries">
         <h2>Entries for {{ selected_date }}</h2>
@@ -234,6 +256,36 @@
         <p class="empty">No exercises recorded for this date.</p>
         {% endif %}
     </div>
+
+    <!-- Plan panel -->
+    <div class="plan-panel">
+        <h2>📋 Plan</h2>
+        <h3>To-Do</h3>
+        {% if todo_items %}
+        {% for item in todo_items %}
+        <div class="plan-item">
+            <code>{{ item.last_entry }}</code>
+            <span class="plan-name">{{ item.name }} ({{ item.last_date }})</span>
+        </div>
+        {% endfor %}
+        {% else %}
+        <p class="empty" style="font-size:0.85rem;">All caught up! 🎉</p>
+        {% endif %}
+
+        <h3>Slipping</h3>
+        {% if slipping_items %}
+        {% for item in slipping_items %}
+        <div class="plan-item">
+            <code>{{ item.code }}</code>
+            <span class="plan-name">{{ item.name }}</span>
+        </div>
+        {% endfor %}
+        {% else %}
+        <p class="empty" style="font-size:0.85rem;">Nothing slipping 👍</p>
+        {% endif %}
+    </div>
+
+    </div> <!-- end entries-plan-row -->
 
     <!-- Recent History Lookup -->
     <div class="card" style="margin:1.5rem auto; max-width:900px; padding:1rem 1.5rem;">

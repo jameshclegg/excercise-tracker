@@ -325,6 +325,88 @@ def logout():
     return redirect(url_for("login"))
 
 
+def _compute_plan_data():
+    """Compute to-do and slipping exercise lists.
+
+    To-do: exercises done in last 7 days but not in last 2 days,
+           with most recent entry details.
+    Slipping: exercises done in last 30 days but not in last 7 days.
+    """
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    today = date.today()
+
+    # To-do: done in last 7 days but not last 2 days
+    cur.execute(
+        """
+        SELECT DISTINCT e.exercise_code AS code, ex.name
+        FROM entries e
+        JOIN exercises ex ON e.exercise_code = ex.code
+        WHERE e.date >= %s AND e.date < %s
+          AND e.exercise_code NOT IN (
+              SELECT DISTINCT exercise_code FROM entries WHERE date >= %s
+          )
+        ORDER BY ex.name
+        """,
+        (
+            (today - timedelta(days=7)).isoformat(),
+            (today - timedelta(days=1)).isoformat(),
+            (today - timedelta(days=2)).isoformat(),
+        ),
+    )
+    todo_codes = cur.fetchall()
+
+    # For each to-do exercise, get most recent entry details
+    todo_items = []
+    for row in todo_codes:
+        cur.execute(
+            """
+            SELECT e.date, e.sets, e.weight
+            FROM entries e
+            WHERE e.exercise_code = %s
+            ORDER BY e.date DESC, e.id DESC
+            LIMIT 1
+            """,
+            (row["code"],),
+        )
+        last = cur.fetchone()
+        parts = [row["code"]]
+        if last and last["sets"]:
+            parts.append(last["sets"])
+        if last and last["weight"]:
+            parts.append(f"@ {last['weight']}kg")
+        todo_items.append({
+            "code": row["code"],
+            "name": row["name"],
+            "last_entry": " ".join(parts),
+            "last_date": last["date"].isoformat() if last else None,
+        })
+
+    # Slipping: done in last 30 days but not last 7 days
+    cur.execute(
+        """
+        SELECT DISTINCT e.exercise_code AS code, ex.name
+        FROM entries e
+        JOIN exercises ex ON e.exercise_code = ex.code
+        WHERE e.date >= %s AND e.date < %s
+          AND e.exercise_code NOT IN (
+              SELECT DISTINCT exercise_code FROM entries WHERE date >= %s
+          )
+        ORDER BY ex.name
+        """,
+        (
+            (today - timedelta(days=30)).isoformat(),
+            (today - timedelta(days=7)).isoformat(),
+            (today - timedelta(days=7)).isoformat(),
+        ),
+    )
+    slipping_items = cur.fetchall()
+
+    cur.close()
+    conn.close()
+    return {"todo_items": todo_items, "slipping_items": slipping_items}
+
+
 @app.route("/")
 @require_login
 def index():
@@ -363,6 +445,7 @@ def index():
     conn.close()
 
     stats_data = _compute_stats_data()
+    plan_data = _compute_plan_data()
 
     return render_template(
         "index.html",
@@ -373,6 +456,7 @@ def index():
         recent_dates=recent_dates,
         input_types=INPUT_TYPES,
         **stats_data,
+        **plan_data,
     )
 
 
@@ -926,9 +1010,56 @@ def telegram_webhook():
 
     # Handle bot commands
     if text.startswith("/"):
+        lower = text.lower().strip()
+        if lower in ("/todo", "/todo@" + TELEGRAM_BOT_TOKEN.split(":")[0] if TELEGRAM_BOT_TOKEN else ""):
+            plan = _compute_plan_data()
+            if not plan["todo_items"]:
+                telegram_reply(chat_id, "✅ All caught up! Nothing to do.")
+            else:
+                lines = ["📋 *To-Do*\n"]
+                for item in plan["todo_items"]:
+                    lines.append(f"  `{item['last_entry']}` — {item['name']} ({item['last_date']})")
+                telegram_reply(chat_id, "\n".join(lines))
+            return jsonify({"ok": True})
+
+        if lower in ("/slipping", "/slipping@" + TELEGRAM_BOT_TOKEN.split(":")[0] if TELEGRAM_BOT_TOKEN else ""):
+            plan = _compute_plan_data()
+            if not plan["slipping_items"]:
+                telegram_reply(chat_id, "👍 Nothing slipping!")
+            else:
+                lines = ["⚠️ *Slipping*\n"]
+                for item in plan["slipping_items"]:
+                    lines.append(f"  `{item['code']}` — {item['name']}")
+                telegram_reply(chat_id, "\n".join(lines))
+            return jsonify({"ok": True})
+
+        if lower in ("/plan",):
+            plan = _compute_plan_data()
+            lines = []
+            if plan["todo_items"]:
+                lines.append("📋 *To-Do*\n")
+                for item in plan["todo_items"]:
+                    lines.append(f"  `{item['last_entry']}` — {item['name']} ({item['last_date']})")
+            else:
+                lines.append("✅ All caught up!\n")
+            lines.append("")
+            if plan["slipping_items"]:
+                lines.append("⚠️ *Slipping*\n")
+                for item in plan["slipping_items"]:
+                    lines.append(f"  `{item['code']}` — {item['name']}")
+            else:
+                lines.append("👍 Nothing slipping!")
+            telegram_reply(chat_id, "\n".join(lines))
+            return jsonify({"ok": True})
+
+        # Default help for unknown commands
         telegram_reply(chat_id, "👋 Exercise & Weight Tracker Bot\n\n"
                        "Send a weight like: 64.4\n"
-                       "Or exercises like: p -13 5 4, a 1, vb")
+                       "Or exercises like: p -13 5 4, a 1, vb\n\n"
+                       "Commands:\n"
+                       "/todo — exercises to do\n"
+                       "/slipping — exercises slipping\n"
+                       "/plan — both lists")
         return jsonify({"ok": True})
 
     # Check for /test suffix
