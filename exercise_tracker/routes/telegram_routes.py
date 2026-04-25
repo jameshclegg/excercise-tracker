@@ -240,11 +240,25 @@ def telegram_webhook():
             if not rows:
                 telegram_reply(chat_id, "⚖️ No weight entries in the last 7 days.")
             else:
-                lines = ["⚖️ *Weight — last 7 days*\n"]
+                import statistics
+                weights = [float(r["weight"]) for r in rows]
+                mean = statistics.mean(weights)
+                stdev = statistics.stdev(weights) if len(weights) > 1 else 0.0
+
+                entries = []
                 for r in rows:
+                    w = float(r["weight"])
                     days_ago = (today - r["date"]).days
-                    day_label = "today" if days_ago == 0 else f"{days_ago}d ago"
-                    lines.append(f"  {r['weight']} kg ({day_label})")
+                    if days_ago == 0:
+                        entries.append(f"{w:.1f} (today)")
+                    else:
+                        entries.append(f"{w:.1f}")
+
+                lines = [
+                    f"⚖️ Weight — last 7 days\n",
+                    f"  {', '.join(entries)}",
+                    f"  Mean: {mean:.1f} kg, SD: {stdev:.1f} kg",
+                ]
                 telegram_reply(chat_id, "\n".join(lines))
             return jsonify({"ok": True})
 
