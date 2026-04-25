@@ -32,6 +32,7 @@ R = push ups [strength] {chest}
 RR = ring rows [strength] {back}
 RS = pike push up [strength] {chest}
 S = squat [strength] {legs}
+SC = skin the cat [flexibility] {back}
 SP = pistol squat [strength] {legs}
 SQ = overhead tricep curls [strength] {arms}
 SS = pistol squat [strength] {legs}
