@@ -3,9 +3,11 @@
 import json
 import re
 import urllib.request
-from datetime import date
+from collections import defaultdict
+from datetime import date, timedelta
 
 from flask import Blueprint, jsonify, request
+from psycopg2.extras import RealDictCursor
 
 from ..config import TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID
 from ..db import get_db
@@ -108,14 +110,140 @@ def telegram_webhook():
             telegram_reply(chat_id, "\n".join(lines))
             return jsonify({"ok": True})
 
+        if lower.startswith("/today"):
+            today_str = date.today().isoformat()
+            conn = get_db()
+            cur = conn.cursor(cursor_factory=RealDictCursor)
+            cur.execute(
+                """
+                SELECT e.exercise_code, e.sets, e.weight, ex.name
+                FROM entries e
+                JOIN exercises ex ON e.exercise_code = ex.code
+                WHERE e.date = %s
+                ORDER BY e.created_at
+                """,
+                (today_str,),
+            )
+            rows = cur.fetchall()
+            cur.close()
+            conn.close()
+            if not rows:
+                telegram_reply(chat_id, f"📅 No exercises recorded for today ({today_str}).")
+            else:
+                lines = [f"📅 Today ({today_str}):\n"]
+                for r in rows:
+                    parts = [f"`{r['exercise_code']}`"]
+                    if r["sets"]:
+                        parts.append(r["sets"])
+                    if r["weight"]:
+                        parts.append(f"@ {r['weight']}kg")
+                    parts.append(f"— {r['name']}")
+                    lines.append("  " + " ".join(parts))
+                telegram_reply(chat_id, "\n".join(lines))
+            return jsonify({"ok": True})
+
+        if lower.startswith("/recent") and not lower.startswith("/recentw"):
+            today = date.today()
+            conn = get_db()
+            cur = conn.cursor(cursor_factory=RealDictCursor)
+            cur.execute(
+                """
+                SELECT e.date, e.exercise_code, e.sets, e.weight, ex.name
+                FROM entries e
+                JOIN exercises ex ON e.exercise_code = ex.code
+                WHERE e.date >= %s
+                ORDER BY e.date DESC, e.created_at
+                """,
+                ((today - timedelta(days=7)).isoformat(),),
+            )
+            rows = cur.fetchall()
+            cur.close()
+            conn.close()
+            if not rows:
+                telegram_reply(chat_id, "📊 No exercises in the last 7 days.")
+                return jsonify({"ok": True})
+
+            # Group by date
+            by_date = defaultdict(list)
+            for r in rows:
+                by_date[r["date"]].append(r)
+
+            lines = ["📊 *Last 7 days*\n"]
+            for d in sorted(by_date.keys(), reverse=True):
+                days_ago = (today - d).days
+                day_label = "today" if days_ago == 0 else f"{days_ago}d ago"
+                codes = [r["exercise_code"] for r in by_date[d]]
+                # deduplicate while preserving order
+                seen = set()
+                unique_codes = []
+                for c in codes:
+                    if c not in seen:
+                        seen.add(c)
+                        unique_codes.append(c)
+                lines.append(f"  {day_label}: {', '.join(unique_codes)}")
+
+            # Group by exercise
+            by_exercise = defaultdict(list)
+            for r in rows:
+                by_exercise[r["exercise_code"]].append(r)
+
+            lines.append("\n📋 *By exercise*\n")
+            for code in sorted(by_exercise.keys()):
+                entries = by_exercise[code]
+                name = entries[0]["name"]
+                details = []
+                for e in entries:
+                    days_ago = (today - e["date"]).days
+                    day_label = "today" if days_ago == 0 else f"{days_ago}d ago"
+                    parts = []
+                    if e["sets"]:
+                        parts.append(e["sets"])
+                    if e["weight"]:
+                        parts.append(f"@{e['weight']}kg")
+                    detail = " ".join(parts) if parts else "✓"
+                    details.append(f"{detail} ({day_label})")
+                lines.append(f"  `{code}` {name}: {', '.join(details)}")
+
+            telegram_reply(chat_id, "\n".join(lines))
+            return jsonify({"ok": True})
+
+        if lower.startswith("/recentw"):
+            today = date.today()
+            conn = get_db()
+            cur = conn.cursor(cursor_factory=RealDictCursor)
+            cur.execute(
+                """
+                SELECT date, weight FROM weights
+                WHERE date >= %s
+                ORDER BY date DESC
+                """,
+                ((today - timedelta(days=7)).isoformat(),),
+            )
+            rows = cur.fetchall()
+            cur.close()
+            conn.close()
+            if not rows:
+                telegram_reply(chat_id, "⚖️ No weight entries in the last 7 days.")
+            else:
+                lines = ["⚖️ *Weight — last 7 days*\n"]
+                for r in rows:
+                    days_ago = (today - r["date"]).days
+                    day_label = "today" if days_ago == 0 else f"{days_ago}d ago"
+                    lines.append(f"  {r['weight']} kg ({day_label})")
+                telegram_reply(chat_id, "\n".join(lines))
+            return jsonify({"ok": True})
+
         # Default help for unknown commands
         telegram_reply(chat_id, "👋 Exercise & Weight Tracker Bot\n\n"
                        "Send a weight like: 64.4\n"
                        "Or exercises like: p -13 5 4, a 1, vb\n\n"
                        "Commands:\n"
-                       "/todo — exercises to do\n"
+                       "/today — what you did today\n"
+                       "/recent — last 7 days by date & exercise\n"
+                       "/recentw — weight last 7 days\n"
+                       "/todo — exercises due\n"
                        "/slipping — exercises slipping\n"
-                       "/plan — both lists")
+                       "/plan — todo + slipping")
         return jsonify({"ok": True})
 
     # Check for /test suffix
