@@ -39,6 +39,16 @@ def parse_weight(text):
     return None
 
 
+def _collapse_sets(sets_str):
+    """Collapse repeated equal sets: '9+9+9' → '9 3', '12+10+8' stays as-is."""
+    if not sets_str or "+" not in sets_str:
+        return sets_str
+    parts = sets_str.split("+")
+    if len(set(parts)) == 1:
+        return f"{parts[0]} {len(parts)}"
+    return sets_str
+
+
 @bp.route("/telegram/webhook", methods=["POST"])
 def telegram_webhook():
     if not TELEGRAM_BOT_TOKEN:
@@ -120,7 +130,7 @@ def telegram_webhook():
                 FROM entries e
                 JOIN exercises ex ON e.exercise_code = ex.code
                 WHERE e.date = %s
-                ORDER BY e.created_at
+                ORDER BY e.exercise_code
                 """,
                 (today_str,),
             )
@@ -132,9 +142,9 @@ def telegram_webhook():
             else:
                 lines = [f"📅 Today ({today_str}):\n"]
                 for r in rows:
-                    parts = [f"`{r['exercise_code']}`"]
+                    parts = [r["exercise_code"]]
                     if r["sets"]:
-                        parts.append(r["sets"])
+                        parts.append(_collapse_sets(r["sets"]))
                     if r["weight"]:
                         parts.append(f"@ {r['weight']}kg")
                     parts.append(f"— {r['name']}")
@@ -168,7 +178,7 @@ def telegram_webhook():
             for r in rows:
                 by_date[r["date"]].append(r)
 
-            lines = ["📊 *Last 7 days*\n"]
+            lines = ["📊 Last 7 days:\n"]
             for d in sorted(by_date.keys(), reverse=True):
                 days_ago = (today - d).days
                 day_label = "today" if days_ago == 0 else f"{days_ago}d ago"
@@ -187,22 +197,21 @@ def telegram_webhook():
             for r in rows:
                 by_exercise[r["exercise_code"]].append(r)
 
-            lines.append("\n📋 *By exercise*\n")
+            lines.append("\n📋 By exercise:\n")
             for code in sorted(by_exercise.keys()):
                 entries = by_exercise[code]
-                name = entries[0]["name"]
                 details = []
                 for e in entries:
                     days_ago = (today - e["date"]).days
                     day_label = "today" if days_ago == 0 else f"{days_ago}d ago"
                     parts = []
                     if e["sets"]:
-                        parts.append(e["sets"])
+                        parts.append(_collapse_sets(e["sets"]))
                     if e["weight"]:
                         parts.append(f"@{e['weight']}kg")
                     detail = " ".join(parts) if parts else "✓"
                     details.append(f"{detail} ({day_label})")
-                lines.append(f"  `{code}` {name}: {', '.join(details)}")
+                lines.append(f"  {code}: {', '.join(details)}")
 
             telegram_reply(chat_id, "\n".join(lines))
             return jsonify({"ok": True})
@@ -233,6 +242,33 @@ def telegram_webhook():
                 telegram_reply(chat_id, "\n".join(lines))
             return jsonify({"ok": True})
 
+        if lower.startswith("/codes"):
+            today = date.today()
+            conn = get_db()
+            cur = conn.cursor(cursor_factory=RealDictCursor)
+            cur.execute(
+                """
+                SELECT ex.code, ex.name,
+                       MAX(e.date) as last_done
+                FROM exercises ex
+                LEFT JOIN entries e ON ex.code = e.exercise_code
+                GROUP BY ex.code, ex.name
+                ORDER BY MAX(e.date) DESC NULLS LAST, ex.code
+                """,
+            )
+            rows = cur.fetchall()
+            cur.close()
+            conn.close()
+            lines = ["📖 Exercise codes:\n"]
+            for r in rows:
+                if r["last_done"]:
+                    days_ago = (today - r["last_done"]).days
+                    lines.append(f"  {r['code']} — {r['name']} ({days_ago}d ago)")
+                else:
+                    lines.append(f"  {r['code']} — {r['name']} (never)")
+            telegram_reply(chat_id, "\n".join(lines))
+            return jsonify({"ok": True})
+
         # Default help for unknown commands
         telegram_reply(chat_id, "👋 Exercise & Weight Tracker Bot\n\n"
                        "Send a weight like: 64.4\n"
@@ -241,6 +277,7 @@ def telegram_webhook():
                        "/today — what you did today\n"
                        "/recent — last 7 days by date & exercise\n"
                        "/recentw — weight last 7 days\n"
+                       "/codes — all exercise codes\n"
                        "/todo — exercises due\n"
                        "/slipping — exercises slipping\n"
                        "/plan — todo + slipping")
