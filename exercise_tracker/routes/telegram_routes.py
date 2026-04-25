@@ -303,7 +303,98 @@ def telegram_webhook():
                        "/codes — all exercise codes\n"
                        "/todo — exercises due\n"
                        "/slipping — exercises slipping\n"
-                       "/plan — todo + slipping")
+                       "/plan — todo + slipping\n"
+                       "\n"
+                       "P /recent — last 4 sessions for P\n"
+                       "P /notes — notes for P")
+        return jsonify({"ok": True})
+
+    # Handle [code] /recent and [code] /notes
+    lower = text.lower().strip()
+    recent_match = re.match(r"^(\S+)\s+/recent$", lower)
+    notes_match = re.match(r"^(\S+)\s+/notes$", lower)
+
+    if recent_match:
+        code_raw = recent_match.group(1)
+        valid_codes = get_valid_codes()
+        from ..parsing import normalize_code
+        code = normalize_code(code_raw, valid_codes)
+        if code not in valid_codes:
+            telegram_reply(chat_id, f"❓ Unknown exercise code: {code_raw}")
+            return jsonify({"ok": True})
+
+        today = date.today()
+        conn = get_db()
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        cur.execute(
+            """
+            SELECT e.date, e.sets, e.weight, ex.name
+            FROM entries e
+            JOIN exercises ex ON e.exercise_code = ex.code
+            WHERE e.exercise_code = %s
+            ORDER BY e.date DESC, e.id DESC
+            LIMIT 20
+            """,
+            (code,),
+        )
+        rows = cur.fetchall()
+        cur.close()
+        conn.close()
+
+        if not rows:
+            telegram_reply(chat_id, f"No history for {code}.")
+            return jsonify({"ok": True})
+
+        # Group by date, take last 4 dates
+        from collections import OrderedDict
+        by_date = OrderedDict()
+        for r in rows:
+            d = r["date"]
+            if d not in by_date:
+                if len(by_date) >= 4:
+                    break
+                by_date[d] = []
+            by_date[d].append(r)
+
+        name = rows[0]["name"]
+        lines = [f"📊 {code} — {name}\n"]
+        for d, entries in by_date.items():
+            days_ago = (today - d).days
+            day_label = "today" if days_ago == 0 else f"{days_ago}d ago"
+            for e in entries:
+                parts = []
+                if e["sets"]:
+                    parts.append(_collapse_sets(e["sets"]))
+                if e["weight"]:
+                    parts.append(f"@ {e['weight']}kg")
+                detail = " ".join(parts) if parts else "✓"
+                lines.append(f"  {day_label}: {detail}")
+        telegram_reply(chat_id, "\n".join(lines))
+        return jsonify({"ok": True})
+
+    if notes_match:
+        code_raw = notes_match.group(1)
+        valid_codes = get_valid_codes()
+        from ..parsing import normalize_code
+        code = normalize_code(code_raw, valid_codes)
+        if code not in valid_codes:
+            telegram_reply(chat_id, f"❓ Unknown exercise code: {code_raw}")
+            return jsonify({"ok": True})
+
+        conn = get_db()
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        cur.execute("SELECT ex.name FROM exercises ex WHERE ex.code = %s", (code,))
+        ex = cur.fetchone()
+        cur.execute("SELECT notes FROM exercise_notes WHERE exercise_code = %s", (code,))
+        row = cur.fetchone()
+        cur.close()
+        conn.close()
+
+        name = ex["name"] if ex else code
+        if row and row["notes"].strip():
+            telegram_reply(chat_id, f"📝 {code} — {name}\n\n{row['notes']}")
+        else:
+            telegram_reply(chat_id, f"📝 {code} — {name}\n\nNo notes.")
         return jsonify({"ok": True})
 
     # Check for /test suffix
