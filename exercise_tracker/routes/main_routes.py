@@ -137,8 +137,7 @@ def add_entry():
             flash(f"Added {count} entries")
 
     redirect_to = request.form.get("redirect", "/")
-    next_date = (date.fromisoformat(entry_date) + timedelta(days=1)).isoformat()
-    return redirect(f"{redirect_to}?date={next_date}")
+    return redirect(f"{redirect_to}?date={entry_date}")
 
 
 @bp.route("/delete/<int:entry_id>", methods=["POST"])
