@@ -1,6 +1,7 @@
 """Telegram bot webhook route."""
 
 import json
+import os
 import re
 import urllib.request
 from collections import defaultdict
@@ -10,6 +11,8 @@ from flask import Blueprint, jsonify, request
 from psycopg2.extras import RealDictCursor
 
 from ..config import TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID
+
+WEIGHT_TRACKER_URL = os.environ.get("WEIGHT_TRACKER_URL", "")
 from ..db import get_db
 from ..parsing import get_valid_codes, parse_bulk_entry
 from ..plan import compute_plan_data
@@ -332,6 +335,12 @@ def telegram_webhook():
             conn.close()
             telegram_reply(chat_id, f"⚖️ Understood {weight} as weight {weight} kg.\n"
                            f"Posted to weight tracker for {today_str}.{test_label}")
+            # Wake up the weight tracker app so it's ready when visited
+            if WEIGHT_TRACKER_URL and not test_mode:
+                try:
+                    urllib.request.urlopen(WEIGHT_TRACKER_URL, timeout=5)
+                except Exception:
+                    pass  # best-effort, don't fail the response
         except Exception as e:
             telegram_reply(chat_id, f"❌ Error saving weight: {e}")
         return jsonify({"ok": True})
