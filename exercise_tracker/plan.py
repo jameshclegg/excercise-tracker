@@ -64,6 +64,9 @@ def compute_plan_data():
             "days_ago": (today - last["date"]).days if last else None,
         })
 
+    # Sort by most neglected first (highest days_ago)
+    todo_items.sort(key=lambda x: x["days_ago"] or 999, reverse=True)
+
     # Slipping: done in last 30 days but not last 7 days
     cur.execute(
         """

@@ -122,17 +122,21 @@ def telegram_webhook():
 
         if lower.startswith("/today"):
             today_str = date.today().isoformat()
+            today = date.today()
             conn = get_db()
             cur = conn.cursor(cursor_factory=RealDictCursor)
             cur.execute(
                 """
-                SELECT e.exercise_code, e.sets, e.weight, ex.name
+                SELECT e.exercise_code, e.sets, e.weight, ex.name,
+                       (SELECT MAX(e2.date) FROM entries e2
+                        WHERE e2.exercise_code = e.exercise_code AND e2.date < %s
+                       ) as prev_date
                 FROM entries e
                 JOIN exercises ex ON e.exercise_code = ex.code
                 WHERE e.date = %s
                 ORDER BY e.exercise_code
                 """,
-                (today_str,),
+                (today_str, today_str),
             )
             rows = cur.fetchall()
             cur.close()
@@ -140,6 +144,8 @@ def telegram_webhook():
             if not rows:
                 telegram_reply(chat_id, f"📅 No exercises recorded for today ({today_str}).")
             else:
+                # Sort by least recently done previously (most neglected first)
+                rows.sort(key=lambda r: r["prev_date"] or date.min)
                 lines = [f"📅 Today ({today_str}):\n"]
                 for r in rows:
                     parts = [r["exercise_code"]]
