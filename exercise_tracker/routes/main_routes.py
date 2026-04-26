@@ -49,9 +49,6 @@ def index():
 
     next_date = (date.fromisoformat(selected_date) + timedelta(days=1)).isoformat()
 
-    cur.close()
-    conn.close()
-
     stats_data = compute_stats_data()
     plan_data = compute_plan_data()
 
@@ -92,8 +89,6 @@ def mobile():
 
     next_date = (date.fromisoformat(selected_date) + timedelta(days=1)).isoformat()
 
-    cur.close()
-    conn.close()
     return render_template(
         "mobile.html",
         exercises=exercises,
@@ -129,8 +124,6 @@ def add_entry():
                     (entry_date, code, sets_str, weight, notes),
                 )
                 count += 1
-        cur.close()
-        conn.close()
         if errors:
             flash(f"Added {count} entries. Errors: {'; '.join(errors)}")
         elif count > 0:
@@ -147,8 +140,6 @@ def delete_entry(entry_id):
     conn = get_db()
     cur = conn.cursor()
     cur.execute("DELETE FROM entries WHERE id = %s", (entry_id,))
-    cur.close()
-    conn.close()
 
     redirect_to = request.form.get("redirect", "/")
     return redirect(f"{redirect_to}?date={entry_date}")

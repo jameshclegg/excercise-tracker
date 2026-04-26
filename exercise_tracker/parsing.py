@@ -11,8 +11,6 @@ def get_valid_codes():
     cur = conn.cursor()
     cur.execute("SELECT code FROM exercises")
     codes = {r[0] for r in cur.fetchall()}
-    cur.close()
-    conn.close()
     return codes
 
 

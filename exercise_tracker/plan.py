@@ -86,6 +86,4 @@ def compute_plan_data():
     todo_items.sort(key=lambda x: x["days_ago"], reverse=True)
     slipping_items.sort(key=lambda x: x["days_ago"], reverse=True)
 
-    cur.close()
-    conn.close()
     return {"todo_items": todo_items, "slipping_items": slipping_items}

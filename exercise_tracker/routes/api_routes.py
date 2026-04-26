@@ -18,8 +18,6 @@ def exercises():
     cur = conn.cursor(cursor_factory=RealDictCursor)
     cur.execute("SELECT * FROM exercises ORDER BY code")
     exercises = cur.fetchall()
-    cur.close()
-    conn.close()
     return jsonify(exercises)
 
 
@@ -30,8 +28,6 @@ def get_notes():
     cur = conn.cursor(cursor_factory=RealDictCursor)
     cur.execute("SELECT exercise_code, notes, updated_at FROM exercise_notes ORDER BY exercise_code")
     notes = cur.fetchall()
-    cur.close()
-    conn.close()
     return jsonify(notes)
 
 
@@ -56,8 +52,6 @@ def save_note():
         """, (code, notes_text))
     else:
         cur.execute("DELETE FROM exercise_notes WHERE exercise_code = %s", (code,))
-    cur.close()
-    conn.close()
     return jsonify({"ok": True})
 
 
@@ -68,8 +62,6 @@ def get_injury_notes():
     cur = conn.cursor()
     cur.execute("SELECT notes FROM injury_notes WHERE id = 1")
     row = cur.fetchone()
-    cur.close()
-    conn.close()
     return jsonify({"notes": row[0] if row else ""})
 
 
@@ -87,8 +79,6 @@ def save_injury_notes():
             notes = EXCLUDED.notes,
             updated_at = NOW()
     """, (notes_text,))
-    cur.close()
-    conn.close()
     return jsonify({"ok": True})
 
 
@@ -108,8 +98,6 @@ def recent(code):
     rows = cur.fetchall()
     cur.execute("SELECT notes FROM exercise_notes WHERE exercise_code = %s", (code,))
     notes_row = cur.fetchone()
-    cur.close()
-    conn.close()
     # Group by date (most recent 3 dates)
     by_date = OrderedDict()
     for r in rows:

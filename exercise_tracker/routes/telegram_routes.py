@@ -13,7 +13,7 @@ from psycopg2.extras import RealDictCursor
 from ..config import TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID
 
 WEIGHT_TRACKER_URL = os.environ.get("WEIGHT_TRACKER_URL", "")
-from ..db import get_db
+from ..db import get_db, get_db_transaction
 from ..parsing import get_valid_codes, parse_bulk_entry
 from ..plan import compute_plan_data
 
@@ -142,8 +142,6 @@ def telegram_webhook():
                 (today_str, today_str),
             )
             rows = cur.fetchall()
-            cur.close()
-            conn.close()
             if not rows:
                 telegram_reply(chat_id, f"📅 No exercises recorded for today ({today_str}).")
             else:
@@ -176,8 +174,6 @@ def telegram_webhook():
                 ((today - timedelta(days=7)).isoformat(),),
             )
             rows = cur.fetchall()
-            cur.close()
-            conn.close()
             if not rows:
                 telegram_reply(chat_id, "📊 No exercises in the last 7 days.")
                 return jsonify({"ok": True})
@@ -238,8 +234,6 @@ def telegram_webhook():
                 ((today - timedelta(days=7)).isoformat(),),
             )
             rows = cur.fetchall()
-            cur.close()
-            conn.close()
             if not rows:
                 telegram_reply(chat_id, "⚖️ No weight entries in the last 7 days.")
             else:
@@ -280,8 +274,6 @@ def telegram_webhook():
                 """,
             )
             rows = cur.fetchall()
-            cur.close()
-            conn.close()
             lines = ["📖 Exercise codes:\n"]
             for r in rows:
                 if r["last_done"]:
@@ -338,8 +330,6 @@ def telegram_webhook():
             (code,),
         )
         rows = cur.fetchall()
-        cur.close()
-        conn.close()
 
         if not rows:
             telegram_reply(chat_id, f"No history for {code}.")
@@ -387,8 +377,6 @@ def telegram_webhook():
         ex = cur.fetchone()
         cur.execute("SELECT notes FROM exercise_notes WHERE exercise_code = %s", (code,))
         row = cur.fetchone()
-        cur.close()
-        conn.close()
 
         name = ex["name"] if ex else code
         if row and row["notes"].strip():
@@ -410,20 +398,17 @@ def telegram_webhook():
     weight = parse_weight(text)
     if weight is not None:
         try:
-            conn = get_db()
-            conn.autocommit = False
-            cur = conn.cursor()
-            cur.execute(
-                "INSERT INTO weights (date, weight) VALUES (%s, %s) "
-                "ON CONFLICT (date) DO UPDATE SET weight = EXCLUDED.weight",
-                (today_str, weight),
-            )
-            if test_mode:
-                conn.rollback()
-            else:
-                conn.commit()
-            cur.close()
-            conn.close()
+            with get_db_transaction() as conn:
+                cur = conn.cursor()
+                cur.execute(
+                    "INSERT INTO weights (date, weight) VALUES (%s, %s) "
+                    "ON CONFLICT (date) DO UPDATE SET weight = EXCLUDED.weight",
+                    (today_str, weight),
+                )
+                if test_mode:
+                    conn.rollback()
+                else:
+                    conn.commit()
             telegram_reply(chat_id, f"⚖️ Understood {weight} as weight {weight} kg.\n"
                            f"Posted to weight tracker for {today_str}.{test_label}")
             # Wake up the weight tracker app so it's ready when visited
@@ -454,29 +439,26 @@ def telegram_webhook():
                            "Or exercises like: p -13 5 4, a 1, vb")
             return jsonify({"ok": True})
 
-        conn = get_db()
-        conn.autocommit = False
-        cur = conn.cursor()
         summaries = []
-        for code, sets_str, weight_val, notes in parsed:
-            cur.execute(
-                "INSERT INTO entries (date, exercise_code, sets, weight, notes) "
-                "VALUES (%s, %s, %s, %s, %s)",
-                (today_str, code, sets_str, weight_val, notes),
-            )
-            parts = [code]
-            if sets_str:
-                parts.append(sets_str)
-            if weight_val:
-                parts.append(f"@ {weight_val}kg")
-            summaries.append(" ".join(parts))
+        with get_db_transaction() as conn:
+            cur = conn.cursor()
+            for code, sets_str, weight_val, notes in parsed:
+                cur.execute(
+                    "INSERT INTO entries (date, exercise_code, sets, weight, notes) "
+                    "VALUES (%s, %s, %s, %s, %s)",
+                    (today_str, code, sets_str, weight_val, notes),
+                )
+                parts = [code]
+                if sets_str:
+                    parts.append(sets_str)
+                if weight_val:
+                    parts.append(f"@ {weight_val}kg")
+                summaries.append(" ".join(parts))
 
-        if test_mode:
-            conn.rollback()
-        else:
-            conn.commit()
-        cur.close()
-        conn.close()
+            if test_mode:
+                conn.rollback()
+            else:
+                conn.commit()
 
         reply = f"🏋️ Posted {len(parsed)} exercise(s) for {today_str}:{test_label}\n"
         reply += "\n".join(f"  • {s}" for s in summaries)

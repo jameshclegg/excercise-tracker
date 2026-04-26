@@ -97,9 +97,6 @@ def compute_stats_data():
     """)
     exercise_stats_raw = cur.fetchall()
 
-    cur.close()
-    conn.close()
-
     timeline_data = {}
     for entry in all_entries:
         code = entry["exercise_code"]

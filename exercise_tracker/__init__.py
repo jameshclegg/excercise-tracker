@@ -8,7 +8,7 @@ load_dotenv()
 
 def create_app():
     from .config import SECRET_KEY
-    from .db import init_db
+    from .db import close_db, init_db
 
     app = Flask(
         __name__,
@@ -19,6 +19,9 @@ def create_app():
 
     # Initialize database
     init_db()
+
+    # Auto-close DB connections after each request
+    app.teardown_appcontext(close_db)
 
     # Register blueprints
     from .routes.auth_routes import bp as auth_bp
