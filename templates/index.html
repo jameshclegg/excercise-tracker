@@ -357,13 +357,13 @@
                 <div class="heatmap-months" id="heatmapMonths"></div>
                 <div style="display:flex;">
                     <div class="heatmap-labels">
-                        <div class="heatmap-label">&nbsp;</div>
                         <div class="heatmap-label">Mon</div>
                         <div class="heatmap-label">&nbsp;</div>
                         <div class="heatmap-label">Wed</div>
                         <div class="heatmap-label">&nbsp;</div>
                         <div class="heatmap-label">Fri</div>
                         <div class="heatmap-label">&nbsp;</div>
+                        <div class="heatmap-label">Sun</div>
                     </div>
                     <div class="heatmap" id="heatmap"></div>
                 </div>
@@ -589,7 +589,7 @@
             const today = new Date();
             const startDate = new Date(today);
             startDate.setFullYear(startDate.getFullYear() - 1);
-            startDate.setDate(startDate.getDate() - startDate.getDay());
+            startDate.setDate(startDate.getDate() - ((startDate.getDay() + 6) % 7));
 
             const maxCount = Math.max(1, ...Object.values(dailyCounts));
             const colors = ['#161b22', '#0e4429', '#006d32', '#26a641', '#39d353'];
