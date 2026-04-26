@@ -25,6 +25,7 @@ CATEGORY_DEFAULT_INPUT = {
     "skill": "time_sets",
     "flexibility": "none",
     "fitness": "none",
+    "physio": "reps_sets",
 }
 
 CODE_INPUT_OVERRIDES = {
