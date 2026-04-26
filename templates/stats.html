@@ -79,6 +79,7 @@
         .cat-fitness { background: #2ecc7133; color: #2ecc71; }
         .cat-physio { background: #1abc9c33; color: #1abc9c; }
         .cat-flexibility { background: #3498db33; color: #3498db; }
+        .cat-music { background: #e91e6333; color: #e91e63; }
         .neglect-bar { height: 6px; border-radius: 3px; background: #333; position: relative;
                        overflow: hidden; min-width: 60px; }
         .neglect-fill { height: 100%; border-radius: 3px; }
@@ -303,7 +304,8 @@
             skill: '#9b59b6',
             fitness: '#2ecc71',
             flexibility: '#3498db',
-            physio: '#1abc9c'
+            physio: '#1abc9c',
+            music: '#e91e63'
         };
         const catColorsBg = {
             strength: 'rgba(231,76,60,0.2)',
@@ -311,7 +313,8 @@
             skill: 'rgba(155,89,182,0.2)',
             fitness: 'rgba(46,204,113,0.2)',
             flexibility: 'rgba(52,152,219,0.2)',
-            physio: 'rgba(26,188,156,0.2)'
+            physio: 'rgba(26,188,156,0.2)',
+            music: 'rgba(233,30,99,0.2)'
         };
 
         // Chart.js defaults for dark theme
@@ -455,7 +458,7 @@
                 target[ex.category].push(ex);
             });
 
-            const categoryOrder = ['strength', 'isometric', 'skill', 'fitness', 'flexibility', 'physio'];
+            const categoryOrder = ['strength', 'isometric', 'skill', 'fitness', 'flexibility', 'physio', 'music'];
 
             const bodyAreaOrder = ['back', 'chest', 'arms', 'legs', 'core'];
 
@@ -594,7 +597,7 @@
                 byCategory[ex.category].push(ex);
             });
 
-            const categoryOrder = ['strength', 'isometric', 'skill', 'fitness', 'flexibility', 'physio'];
+            const categoryOrder = ['strength', 'isometric', 'skill', 'fitness', 'flexibility', 'physio', 'music'];
             const bodyAreaOrder2 = ['back', 'chest', 'arms', 'legs', 'core'];
 
             function renderDensityRow(ex, cat) {
@@ -683,7 +686,7 @@
         // ===== 3. WEEKLY VOLUME (stacked bar) =====
         (function() {
             const weeks = Object.keys(weeklyVolume).sort();
-            const categories = ['strength', 'isometric', 'skill', 'fitness', 'flexibility', 'physio'];
+            const categories = ['strength', 'isometric', 'skill', 'fitness', 'flexibility', 'physio', 'music'];
 
             const datasets = categories.map(cat => ({
                 label: cat.charAt(0).toUpperCase() + cat.slice(1),
@@ -871,6 +874,7 @@
                     const f = filterByDate(data.dates, data.values, cutoff);
                     if (f.dates.length < 3) return;
                     const unitLabel = data.input_type === 'distance' ? 'km' :
+                                      data.input_type === 'minutes' ? 'min' :
                                       data.input_type === 'reps_sets' ? 'total reps' : 'total seconds';
                     const card = document.createElement('div');
                     card.className = 'progress-card';

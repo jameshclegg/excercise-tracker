@@ -114,6 +114,8 @@ def compute_stats_data():
         try:
             if input_type == "distance":
                 value = float(sets_str)
+            elif input_type == "minutes":
+                value = float(sets_str)
             elif input_type in ("reps_sets", "time_sets"):
                 parts = sets_str.split("+")
                 value = sum(float(p) for p in parts)
@@ -218,13 +220,13 @@ def compute_stats_data():
                 first_val = q_values[0]
                 last_val = q_values[-1]
                 if last_val > first_val * 1.1:
-                    unit = "km" if pd["input_type"] == "distance" else "reps" if pd["input_type"] == "reps_sets" else "sec"
+                    unit = "km" if pd["input_type"] == "distance" else "min" if pd["input_type"] == "minutes" else "reps" if pd["input_type"] == "reps_sets" else "sec"
                     name = exercise_map[code]["name"] if code in exercise_map else code
                     progress_notes.append(
                         f"{name} improved from {first_val:.0f} to {last_val:.0f} {unit}"
                     )
                 elif last_val < first_val * 0.9:
-                    unit = "km" if pd["input_type"] == "distance" else "reps" if pd["input_type"] == "reps_sets" else "sec"
+                    unit = "km" if pd["input_type"] == "distance" else "min" if pd["input_type"] == "minutes" else "reps" if pd["input_type"] == "reps_sets" else "sec"
                     name = exercise_map[code]["name"] if code in exercise_map else code
                     progress_notes.append(
                         f"{name} decreased from {first_val:.0f} to {last_val:.0f} {unit}"
@@ -277,6 +279,9 @@ def compute_stats_data():
             elif input_type == "distance":
                 value = float(sets_str)
                 label = f"{value} km"
+            elif input_type == "minutes":
+                value = float(sets_str)
+                label = f"{int(value)} min"
             else:
                 continue
         except (ValueError, TypeError):

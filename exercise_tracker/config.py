@@ -15,6 +15,7 @@ INPUT_TYPES = {
     "reps_sets": {"sets": "Sets (e.g. 15+12+10)", "weight": "Weight (kg)"},
     "time_sets": {"sets": "Sets (sec, e.g. 45+45+45)", "weight": "Weight (kg)"},
     "distance": {"sets": "Distance (km)"},
+    "minutes": {"sets": "Duration (minutes)"},
     "none": {},
 }
 
@@ -26,6 +27,7 @@ CATEGORY_DEFAULT_INPUT = {
     "flexibility": "none",
     "fitness": "none",
     "physio": "reps_sets",
+    "music": "minutes",
 }
 
 CODE_INPUT_OVERRIDES = {
