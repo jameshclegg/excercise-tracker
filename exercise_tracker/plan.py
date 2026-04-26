@@ -1,4 +1,4 @@
-"""Plan computation: to-do and slipping exercise lists."""
+"""Plan computation: to-do, slipping, and dormant exercise lists."""
 
 from datetime import date, timedelta
 
@@ -6,86 +6,85 @@ from psycopg2.extras import RealDictCursor
 
 from .db import get_db
 
+DORMANT_DAYS = 35  # 5 weeks
+
 
 def compute_plan_data():
-    """Compute to-do and slipping exercise lists.
+    """Compute to-do and slipping exercise lists based on target frequency.
 
-    To-do: exercises done in last 7 days but not in last 2 days,
-           with most recent entry details.
-    Slipping: exercises done in last 30 days but not in last 7 days.
+    To-do: days_since_last >= 7/freq AND days_since_last < 14
+    Slipping: days_since_last >= 14 AND days_since_last < DORMANT_DAYS
+    Dormant (>= DORMANT_DAYS): not shown
     """
     conn = get_db()
     cur = conn.cursor(cursor_factory=RealDictCursor)
     today = date.today()
 
-    # To-do: done in last 7 days but not last 2 days
+    # Get all exercises with their target frequency and last done date
     cur.execute(
         """
-        SELECT DISTINCT e.exercise_code AS code, ex.name
-        FROM entries e
-        JOIN exercises ex ON e.exercise_code = ex.code
-        WHERE e.date >= %s AND e.date < %s
-          AND e.exercise_code NOT IN (
-              SELECT DISTINCT exercise_code FROM entries WHERE date >= %s
-          )
+        SELECT ex.code, ex.name, ex.target_freq,
+               MAX(e.date) as last_done
+        FROM exercises ex
+        LEFT JOIN entries e ON ex.code = e.exercise_code
+        GROUP BY ex.code, ex.name, ex.target_freq
         ORDER BY ex.name
-        """,
-        (
-            (today - timedelta(days=7)).isoformat(),
-            (today - timedelta(days=1)).isoformat(),
-            (today - timedelta(days=2)).isoformat(),
-        ),
+        """
     )
-    todo_codes = cur.fetchall()
+    all_exercises = cur.fetchall()
 
-    # For each to-do exercise, get most recent entry details
     todo_items = []
-    for row in todo_codes:
-        cur.execute(
-            """
-            SELECT e.date, e.sets, e.weight
-            FROM entries e
-            WHERE e.exercise_code = %s
-            ORDER BY e.date DESC, e.id DESC
-            LIMIT 1
-            """,
-            (row["code"],),
-        )
-        last = cur.fetchone()
-        parts = [row["code"]]
-        if last and last["sets"]:
-            parts.append(last["sets"])
-        if last and last["weight"]:
-            parts.append(f"@ {last['weight']}kg")
-        todo_items.append({
-            "code": row["code"],
-            "name": row["name"],
-            "last_entry": " ".join(parts),
-            "days_ago": (today - last["date"]).days if last else None,
-        })
+    slipping_items = []
 
-    # Sort by most neglected first (highest days_ago)
-    todo_items.sort(key=lambda x: x["days_ago"] or 999, reverse=True)
+    for ex in all_exercises:
+        freq = ex["target_freq"] or 1
+        last_done = ex["last_done"]
 
-    # Slipping: done in last 30 days but not last 7 days
-    cur.execute(
-        """
-        SELECT DISTINCT e.exercise_code AS code, ex.name
-        FROM entries e
-        JOIN exercises ex ON e.exercise_code = ex.code
-        WHERE e.date >= %s AND e.date < %s
-          AND e.exercise_code NOT IN (
-              SELECT DISTINCT exercise_code FROM entries WHERE date >= %s
-          )
-        ORDER BY ex.name
-        """,
-        (
-            (today - timedelta(days=30)).isoformat(),
-            (today - timedelta(days=7)).isoformat(),
-            (today - timedelta(days=7)).isoformat(),
-        ),
-    )
-    slipping_items = cur.fetchall()
+        if not last_done:
+            continue  # never done, skip
+
+        days_since = (today - last_done).days
+
+        if days_since >= DORMANT_DAYS:
+            continue  # dormant
+
+        interval = 7.0 / freq
+
+        if days_since >= 14:
+            # Slipping
+            slipping_items.append({
+                "code": ex["code"],
+                "name": ex["name"],
+                "days_ago": days_since,
+            })
+        elif days_since >= interval:
+            # To-do: get last entry details
+            cur.execute(
+                """
+                SELECT e.date, e.sets, e.weight
+                FROM entries e
+                WHERE e.exercise_code = %s
+                ORDER BY e.date DESC, e.id DESC
+                LIMIT 1
+                """,
+                (ex["code"],),
+            )
+            last = cur.fetchone()
+            parts = [ex["code"]]
+            if last and last["sets"]:
+                parts.append(last["sets"])
+            if last and last["weight"]:
+                parts.append(f"@ {last['weight']}kg")
+            todo_items.append({
+                "code": ex["code"],
+                "name": ex["name"],
+                "last_entry": " ".join(parts),
+                "days_ago": days_since,
+            })
+
+    # Sort by most neglected first
+    todo_items.sort(key=lambda x: x["days_ago"], reverse=True)
+    slipping_items.sort(key=lambda x: x["days_ago"], reverse=True)
 
     cur.close()
     conn.close()

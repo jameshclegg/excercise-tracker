@@ -26,31 +26,33 @@ def parse_exercises_file():
             line = line.strip()
             if not line or line.startswith("#"):
                 continue
-            m = re.match(r"^(\S+)\s*=\s*(.+?)\s*\[(\w+)\](?:\s*\{(\w+)\})?\s*$", line)
+            m = re.match(r"^(\S+)\s*=\s*(.+?)\s*\[(\w+)\](?:\s*\{(\w+)\})?(?:\s*<(\d+)>)?\s*$", line)
             if m:
                 code, name, category = m.group(1), m.group(2).strip(), m.group(3)
                 body_area = m.group(4)
+                target_freq = int(m.group(5)) if m.group(5) else 1
                 input_type = CODE_INPUT_OVERRIDES.get(
                     code, CATEGORY_DEFAULT_INPUT.get(category, "none")
                 )
-                exercises.append((code, name, category, input_type, body_area))
+                exercises.append((code, name, category, input_type, body_area, target_freq))
     return exercises
 
 
 def seed_exercises(cur):
     exercises = parse_exercises_file()
-    for code, name, category, input_type, body_area in exercises:
+    for code, name, category, input_type, body_area, target_freq in exercises:
         cur.execute(
             """
-            INSERT INTO exercises (code, name, category, input_type, body_area)
-            VALUES (%s, %s, %s, %s, %s)
+            INSERT INTO exercises (code, name, category, input_type, body_area, target_freq)
+            VALUES (%s, %s, %s, %s, %s, %s)
             ON CONFLICT (code) DO UPDATE SET
                 name = EXCLUDED.name,
                 category = EXCLUDED.category,
                 input_type = EXCLUDED.input_type,
-                body_area = EXCLUDED.body_area
+                body_area = EXCLUDED.body_area,
+                target_freq = EXCLUDED.target_freq
             """,
-            (code, name, category, input_type, body_area),
+            (code, name, category, input_type, body_area, target_freq),
         )
 
 
@@ -116,6 +118,19 @@ def init_db():
             cur.execute("UPDATE entries SET exercise_code = %s WHERE exercise_code = %s", (new, old))
             cur.execute("UPDATE exercise_notes SET exercise_code = %s WHERE exercise_code = %s", (new, old))
             cur.execute("DELETE FROM exercises WHERE code = %s", (old,))
+    # Migrate: add target_freq column if missing
+    cur.execute("""
+        SELECT column_name FROM information_schema.columns
+        WHERE table_name = 'exercises' AND column_name = 'target_freq'
+    """)
+    if not cur.fetchone():
+        cur.execute("ALTER TABLE exercises ADD COLUMN target_freq INTEGER DEFAULT 1")
+    # Migrate: merge SS into SP and delete SS
+    cur.execute("SELECT 1 FROM exercises WHERE code = 'SS'")
+    if cur.fetchone():
+        cur.execute("UPDATE entries SET exercise_code = 'SP' WHERE exercise_code = 'SS'")
+        cur.execute("UPDATE exercise_notes SET exercise_code = 'SP' WHERE exercise_code = 'SS'")
+        cur.execute("DELETE FROM exercises WHERE code = 'SS'")
     seed_exercises(cur)
     cur.close()
     conn.close()
