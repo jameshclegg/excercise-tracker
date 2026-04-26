@@ -1,6 +1,7 @@
 """Application constants and configuration."""
 
 import os
+from pathlib import Path
 
 DATABASE_URL = os.environ.get("DATABASE_URL", "")
 PASSWORD_HASH = os.environ.get("TIMELINE_PASSWORD", "")
@@ -9,7 +10,7 @@ if not SECRET_KEY:
     import warnings
     warnings.warn("SECRET_KEY not set — using random key (sessions won't persist across restarts)")
     SECRET_KEY = os.urandom(32).hex()
-EXERCISES_FILE = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "exercises.txt")
+EXERCISES_FILE = Path(__file__).resolve().parent.parent / "data" / "exercises.txt"
 
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "")

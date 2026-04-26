@@ -3,6 +3,7 @@
 import os
 import sys
 from collections import OrderedDict
+from pathlib import Path
 
 import psycopg2
 from dotenv import load_dotenv
@@ -42,9 +43,10 @@ def export_data(output_file="data/data_export.txt"):
 
         days[date_str].append(" ".join(parts))
 
-    with open(output_file, "w") as f:
-        for date_str, entries in days.items():
-            f.write(f"{date_str}: {', '.join(entries)}\n")
+    output_path = Path(output_file)
+    output_path.write_text(
+        "".join(f"{d}: {', '.join(e)}\n" for d, e in days.items())
+    )
 
     print(f"Exported {len(rows)} entries across {len(days)} days to {output_file}")
 
@@ -58,16 +60,17 @@ def export_data(output_file="data/data_export.txt"):
     note_rows = cur.fetchall()
 
     if note_rows:
-        notes_file = output_file.replace("data_export", "notes_export").replace("data.txt", "notes.txt")
-        if notes_file == output_file:
-            notes_file = "data/notes_export.txt"
-        with open(notes_file, "w") as f:
-            for code, name, notes_text in note_rows:
-                f.write(f"[{code}] {name}\n")
-                for line in notes_text.split("\n"):
-                    f.write(f"  {line}\n")
-                f.write("\n")
-        print(f"Exported {len(note_rows)} exercise notes to {notes_file}")
+        notes_path = Path(output_file.replace("data_export", "notes_export").replace("data.txt", "notes.txt"))
+        if str(notes_path) == output_file:
+            notes_path = Path("data/notes_export.txt")
+        lines = []
+        for code, name, notes_text in note_rows:
+            lines.append(f"[{code}] {name}\n")
+            for line in notes_text.split("\n"):
+                lines.append(f"  {line}\n")
+            lines.append("\n")
+        notes_path.write_text("".join(lines))
+        print(f"Exported {len(note_rows)} exercise notes to {notes_path}")
     else:
         print("No exercise notes to export")
 
@@ -77,13 +80,13 @@ def export_data(output_file="data/data_export.txt"):
     cur.close()
     conn.close()
 
-    injury_file = "data/injury_notes.txt"
+    injury_path = Path("data/injury_notes.txt")
     if injury_row and injury_row[0].strip():
-        with open(injury_file, "w") as f:
-            f.write(injury_row[0])
-            if not injury_row[0].endswith("\n"):
-                f.write("\n")
-        print(f"Exported injury notes to {injury_file}")
+        text = injury_row[0]
+        if not text.endswith("\n"):
+            text += "\n"
+        injury_path.write_text(text)
+        print(f"Exported injury notes to {injury_path}")
     else:
         print("No injury notes to export")
 

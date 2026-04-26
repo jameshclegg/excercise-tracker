@@ -15,11 +15,12 @@ Commands during entry:
   help      Show this help
 """
 
-import sys
 import os
+import sys
 import atexit
 from datetime import date, timedelta
 from collections import OrderedDict
+from pathlib import Path
 
 START_DATE = date(2025, 1, 3)
 DEFAULT_FILE = "data/data.txt"
@@ -28,20 +29,19 @@ LOCK_SUFFIX = ".lock"
 
 def acquire_lock(filepath):
     """Create a lock file to prevent concurrent instances."""
-    lockfile = filepath + LOCK_SUFFIX
-    if os.path.exists(lockfile):
+    lockfile = Path(str(filepath) + LOCK_SUFFIX)
+    if lockfile.exists():
         print(f"ERROR: Another instance appears to be running (lock file exists: {lockfile})")
         print("If no other instance is running, delete the lock file and try again.")
         sys.exit(1)
-    with open(lockfile, "w") as f:
-        f.write(str(os.getpid()))
+    lockfile.write_text(str(os.getpid()))
     atexit.register(release_lock, lockfile)
 
 
 def release_lock(lockfile):
     """Remove the lock file."""
     try:
-        os.remove(lockfile)
+        Path(lockfile).unlink()
     except OSError:
         pass
 
@@ -49,19 +49,18 @@ def release_lock(lockfile):
 def load_data(filepath):
     """Load existing data from file. Returns OrderedDict of date -> list of codes."""
     data = OrderedDict()
+    path = Path(filepath)
     try:
-        with open(filepath, "r") as f:
-            for line in f:
-                line = line.strip()
-                if not line:
-                    continue
-                if ": " in line:
-                    date_str, codes_str = line.split(": ", 1)
-                    codes = [c.strip() for c in codes_str.split(",") if c.strip()]
-                    data[date_str] = codes
-                else:
-                    # Date with no entries (shouldn't normally happen)
-                    data[line.rstrip(":")] = []
+        for line in path.read_text().splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            if ": " in line:
+                date_str, codes_str = line.split(": ", 1)
+                codes = [c.strip() for c in codes_str.split(",") if c.strip()]
+                data[date_str] = codes
+            else:
+                data[line.rstrip(":")] = []
     except FileNotFoundError:
         pass
     return data
@@ -69,10 +68,12 @@ def load_data(filepath):
 
 def save_data(filepath, data):
     """Save data to file."""
-    with open(filepath, "w") as f:
-        for date_str, codes in data.items():
-            if codes:
-                f.write(f"{date_str}: {', '.join(codes)}\n")
+    path = Path(filepath)
+    lines = []
+    for date_str, codes in data.items():
+        if codes:
+            lines.append(f"{date_str}: {', '.join(codes)}")
+    path.write_text("\n".join(lines) + "\n" if lines else "")
 
 
 def date_to_str(d):
