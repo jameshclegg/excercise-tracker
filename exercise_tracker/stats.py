@@ -129,18 +129,25 @@ def compute_stats_data():
 
     progress_data = {k: v for k, v in progress_data.items() if len(v["dates"]) >= 5}
 
-    # Weight progression data: exercises where weight was recorded
+    # Weight progression data: include all entries for exercises that ever had added weight
+    # Entries without weight are treated as 0
+    weight_ever = set()
+    for entry in all_entries:
+        w = entry["weight"]
+        if w is not None and float(w) > 0:
+            weight_ever.add(entry["exercise_code"])
+
     weight_progress = {}
     for entry in all_entries:
         code = entry["exercise_code"]
-        w = entry["weight"]
-        if w is None or float(w) == 0:
+        if code not in weight_ever:
             continue
         d = entry["date"].isoformat()
+        w = float(entry["weight"]) if entry["weight"] is not None else 0.0
         if code not in weight_progress:
             weight_progress[code] = {"dates": [], "weights": []}
         weight_progress[code]["dates"].append(d)
-        weight_progress[code]["weights"].append(float(w))
+        weight_progress[code]["weights"].append(w)
     weight_progress = {k: v for k, v in weight_progress.items() if len(v["dates"]) >= 2}
 
     today = date.today()
