@@ -338,6 +338,11 @@
                     });
                     html += '</div>';
                 });
+                if (data.exercise_notes) {
+                    html += '<div style="background:#0f3460; border-radius:6px; padding:8px 12px; margin-top:8px; border-left:3px solid #f39c12;">';
+                    html += '<span style="color:#f39c12; font-size:0.8rem;">📝 Notes:</span> ';
+                    html += '<span style="color:#ccc;">' + data.exercise_notes.replace(/\n/g, '<br>') + '</span></div>';
+                }
                 container.innerHTML = html;
             } catch(err) {
                 container.innerHTML = '<p style="color:#f44;">Error loading data</p>';

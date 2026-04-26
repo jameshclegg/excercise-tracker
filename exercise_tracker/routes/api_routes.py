@@ -106,6 +106,8 @@ def recent(code):
         LIMIT 10
     """, (code,))
     rows = cur.fetchall()
+    cur.execute("SELECT notes FROM exercise_notes WHERE exercise_code = %s", (code,))
+    notes_row = cur.fetchone()
     cur.close()
     conn.close()
     # Group by date (most recent 3 dates)
@@ -120,4 +122,8 @@ def recent(code):
             "sets": r["sets"], "weight": float(r["weight"]) if r["weight"] else None,
             "notes": r["notes"], "input_type": r["input_type"]
         })
-    return jsonify({"name": rows[0]["name"] if rows else code, "dates": by_date})
+    return jsonify({
+        "name": rows[0]["name"] if rows else code,
+        "dates": by_date,
+        "exercise_notes": notes_row["notes"] if notes_row else None
+    })
