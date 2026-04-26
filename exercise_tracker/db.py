@@ -26,11 +26,11 @@ def parse_exercises_file():
             line = line.strip()
             if not line or line.startswith("#"):
                 continue
-            m = re.match(r"^(\S+)\s*=\s*(.+?)\s*\[(\w+)\](?:\s*\{(\w+)\})?(?:\s*<(\d+)>)?\s*$", line)
+            m = re.match(r"^(\S+)\s*=\s*(.+?)\s*\[(\w+)\](?:\s*\{(\w+)\})?(?:\s*<([\d.]+)>)?\s*$", line)
             if m:
                 code, name, category = m.group(1), m.group(2).strip(), m.group(3)
                 body_area = m.group(4)
-                target_freq = int(m.group(5)) if m.group(5) else 1
+                target_freq = float(m.group(5)) if m.group(5) else 1
                 input_type = CODE_INPUT_OVERRIDES.get(
                     code, CATEGORY_DEFAULT_INPUT.get(category, "none")
                 )
@@ -124,7 +124,15 @@ def init_db():
         WHERE table_name = 'exercises' AND column_name = 'target_freq'
     """)
     if not cur.fetchone():
-        cur.execute("ALTER TABLE exercises ADD COLUMN target_freq INTEGER DEFAULT 1")
+        cur.execute("ALTER TABLE exercises ADD COLUMN target_freq NUMERIC(4,2) DEFAULT 1")
+    # Migrate: change target_freq from INTEGER to NUMERIC if needed
+    cur.execute("""
+        SELECT data_type FROM information_schema.columns
+        WHERE table_name = 'exercises' AND column_name = 'target_freq'
+    """)
+    col_type = cur.fetchone()
+    if col_type and col_type[0] == 'integer':
+        cur.execute("ALTER TABLE exercises ALTER COLUMN target_freq TYPE NUMERIC(4,2)")
     # Migrate: merge SS into SP and delete SS
     cur.execute("SELECT 1 FROM exercises WHERE code = 'SS'")
     if cur.fetchone():
