@@ -48,7 +48,7 @@ def compute_plan_data():
         if days_since >= DORMANT_DAYS:
             continue  # dormant
 
-        interval = 7.0 / freq
+        interval = 7.0 / float(freq)
 
         if days_since >= 14:
             # Slipping
