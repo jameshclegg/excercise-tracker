@@ -4,6 +4,7 @@
     <title>Exercise Tracker</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
@@ -1085,6 +1086,16 @@
                 chartInstances = [];
 
                 const cutoff = months > 0 ? new Date(today.getFullYear(), today.getMonth() - months, today.getDate()) : null;
+                const xMin = cutoff ? cutoff.toISOString().split('T')[0] : null;
+                const xMax = today.toISOString().split('T')[0];
+                const xScaleOpts = { type: 'time', display: false,
+                    time: { unit: 'day' },
+                    ...(xMin ? { min: xMin } : {}), max: xMax };
+
+                // Convert parallel arrays to {x,y} points
+                function toXY(dates, values) {
+                    return dates.map((d, i) => ({ x: d, y: values[i] }));
+                }
 
                 // Clear grids
                 ['weightProgressGrid', 'activeProgressGrid', 'dormantProgressGrid'].forEach(id => {
@@ -1111,15 +1122,15 @@
                     weightGrid.appendChild(card);
                     chartInstances.push(new Chart(document.getElementById(cid), {
                         type: 'line',
-                        data: { labels: f.dates, datasets: [
-                            { label: 'Weight (kg)', data: f.values, borderColor: '#f39c12',
+                        data: { datasets: [
+                            { label: 'Weight (kg)', data: toXY(f.dates, f.values), borderColor: '#f39c12',
                               backgroundColor: 'rgba(243,156,18,0.15)', fill: true, tension: 0.3,
                               pointRadius: 3, pointHoverRadius: 6, borderWidth: 2 },
-                            { label: 'Trend', data: makeTrend(f.values, 4), borderColor: '#00d4ff',
+                            { label: 'Trend', data: toXY(f.dates, makeTrend(f.values, 4)), borderColor: '#00d4ff',
                               borderDash: [5, 3], pointRadius: 0, borderWidth: 1.5, fill: false }
                         ]},
                         options: { responsive: true,
-                            scales: { x: { display: false }, y: { grid: { color: '#222' }, beginAtZero: false } },
+                            scales: { x: xScaleOpts, y: { grid: { color: '#222' }, beginAtZero: false } },
                             plugins: { legend: { display: false } } }
                     }));
                 });
@@ -1148,15 +1159,15 @@
                     grid.appendChild(card);
                     chartInstances.push(new Chart(document.getElementById(cid), {
                         type: 'line',
-                        data: { labels: f.dates, datasets: [
-                            { label: unitLabel, data: f.values, borderColor: catColors[ex.category],
+                        data: { datasets: [
+                            { label: unitLabel, data: toXY(f.dates, f.values), borderColor: catColors[ex.category],
                               backgroundColor: catColorsBg[ex.category], fill: true, tension: 0.3,
                               pointRadius: 2, pointHoverRadius: 5, borderWidth: 2 },
-                            { label: 'Trend', data: makeTrend(f.values, 5), borderColor: '#00d4ff',
+                            { label: 'Trend', data: toXY(f.dates, makeTrend(f.values, 5)), borderColor: '#00d4ff',
                               borderDash: [5, 3], pointRadius: 0, borderWidth: 1.5, fill: false }
                         ]},
                         options: { responsive: true,
-                            scales: { x: { display: false }, y: { grid: { color: '#222' }, beginAtZero: false } },
+                            scales: { x: xScaleOpts, y: { grid: { color: '#222' }, beginAtZero: false } },
                             plugins: { legend: { display: false } } }
                     }));
                 }
