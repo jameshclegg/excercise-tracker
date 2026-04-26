@@ -29,8 +29,10 @@ def compute_stats_data():
 
     cur.execute("""
         SELECT date, COUNT(*) as count
-        FROM entries
+        FROM entries e
+        JOIN exercises ex ON e.exercise_code = ex.code
         WHERE date >= CURRENT_DATE - INTERVAL '12 months'
+          AND ex.category != 'music'
         GROUP BY date ORDER BY date
     """)
     daily_counts = {r["date"].isoformat(): r["count"] for r in cur.fetchall()}
@@ -40,6 +42,7 @@ def compute_stats_data():
         FROM entries e
         JOIN exercises ex ON e.exercise_code = ex.code
         WHERE e.date >= CURRENT_DATE - INTERVAL '12 months'
+          AND ex.category != 'music'
         ORDER BY e.date, ex.name
     """)
     daily_exercises = {}
