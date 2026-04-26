@@ -5,6 +5,9 @@ from pathlib import Path
 
 DATABASE_URL = os.environ.get("DATABASE_URL", "")
 PASSWORD_HASH = os.environ.get("TIMELINE_PASSWORD", "")
+
+# SECRET_KEY is required for Flask sessions. If not set, generate a random one
+# (sessions won't persist across restarts, but the app still works for dev use).
 SECRET_KEY = os.environ.get("SECRET_KEY", "")
 if not SECRET_KEY:
     import warnings
@@ -40,11 +43,14 @@ CODE_INPUT_OVERRIDES = {
     "E": "time_sets",
 }
 
-# Code aliases for bulk entry parsing
+# Code aliases: common misspellings and shorthand names → canonical codes
 CODE_ALIASES = {
     "hiit": "HH", "climbing": "CC", "climb": "CC",
     "dq": "SQ", "gm": "GM", "gr": "GR",
 }
+
+# Suffix aliases: keyboard-friendly shortcuts using special chars.
+# e.g. 'b*' → BS (barbell squat), 'e\'' → EX (exercise), 'v*' → VG
 SUFFIX_ALIASES = {
     "b*": "BS", "r*": "RS", "s*": "SP", "w*": "WW", "e'": "EX",
     "t*": "PP", "v*": "VG", "g*": "GF",

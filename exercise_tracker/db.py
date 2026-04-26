@@ -56,12 +56,20 @@ def close_db(e=None):
 
 
 def parse_exercises_file():
+    """Parse data/exercises.txt into a list of exercise tuples.
+
+    File format per line:
+        CODE = Name [category] {body_area} <target_freq>
+    where {body_area} and <target_freq> are optional.
+    Lines starting with '#' or blank lines are skipped.
+    """
     exercises = []
     with open(EXERCISES_FILE, "r") as f:
         for line in f:
             line = line.strip()
             if not line or line.startswith("#"):
                 continue
+            # Regex captures: CODE = Name [category] {body_area}? <target_freq>?
             m = re.match(r"^(\S+)\s*=\s*(.+?)\s*\[(\w+)\](?:\s*\{(\w+)\})?(?:\s*<([\d.]+)>)?\s*$", line)
             if m:
                 code, name, category = m.group(1), m.group(2).strip(), m.group(3)
@@ -75,6 +83,11 @@ def parse_exercises_file():
 
 
 def seed_exercises(cur):
+    """Upsert all exercises from the exercises.txt file into the DB.
+
+    Uses ON CONFLICT to update existing rows so the DB always reflects
+    the latest definitions without losing referential integrity.
+    """
     exercises = parse_exercises_file()
     for code, name, category, input_type, body_area, target_freq in exercises:
         cur.execute(
@@ -93,6 +106,11 @@ def seed_exercises(cur):
 
 
 def init_db():
+    """Create tables, run migrations, and seed exercise data.
+
+    Migrations are idempotent (guarded by column/table existence checks)
+    so this is safe to call on every app startup.
+    """
     conn = get_db()
     try:
         cur = conn.cursor()
@@ -105,14 +123,15 @@ def init_db():
                 body_area TEXT
             )
         """)
-        # Migrate: add body_area column if missing
+        # Migration: add body_area column if missing (added after initial schema)
         cur.execute("""
             SELECT column_name FROM information_schema.columns
             WHERE table_name = 'exercises' AND column_name = 'body_area'
         """)
         if not cur.fetchone():
             cur.execute("ALTER TABLE exercises ADD COLUMN body_area TEXT")
-        # Migrate: drop old schema if it has num1/num2/num3 columns
+        # Migration: drop entries table if it still uses the old num1/num2/num3 schema
+        # from the prototype — it will be recreated with the current schema below
         cur.execute("""
             SELECT column_name FROM information_schema.columns
             WHERE table_name = 'entries' AND column_name = 'num1'
@@ -147,7 +166,8 @@ def init_db():
                 updated_at TIMESTAMPTZ DEFAULT NOW()
             )
         """)
-        # Migrate: rename mixed-case codes to uppercase
+        # Migration: rename mixed-case exercise codes to uppercase for consistency.
+        # Early data used e.g. "Bs" instead of "BS"; cascades updates to entries & notes.
         code_renames = [("Bs", "BS"), ("Rs", "RS"), ("Ex", "EX"), ("Gx", "GX"), ("Gy", "GY")]
         for old, new in code_renames:
             cur.execute("SELECT 1 FROM exercises WHERE code = %s", (old,))
@@ -155,14 +175,15 @@ def init_db():
                 cur.execute("UPDATE entries SET exercise_code = %s WHERE exercise_code = %s", (new, old))
                 cur.execute("UPDATE exercise_notes SET exercise_code = %s WHERE exercise_code = %s", (new, old))
                 cur.execute("DELETE FROM exercises WHERE code = %s", (old,))
-        # Migrate: add target_freq column if missing
+        # Migration: add target_freq (times per week) column for planning
         cur.execute("""
             SELECT column_name FROM information_schema.columns
             WHERE table_name = 'exercises' AND column_name = 'target_freq'
         """)
         if not cur.fetchone():
             cur.execute("ALTER TABLE exercises ADD COLUMN target_freq NUMERIC(4,2) DEFAULT 1")
-        # Migrate: change target_freq from INTEGER to NUMERIC if needed
+        # Migration: widen target_freq from INTEGER to NUMERIC to support fractional
+        # frequencies like 0.5 (once every 2 weeks)
         cur.execute("""
             SELECT data_type FROM information_schema.columns
             WHERE table_name = 'exercises' AND column_name = 'target_freq'
@@ -170,7 +191,7 @@ def init_db():
         col_type = cur.fetchone()
         if col_type and col_type[0] == 'integer':
             cur.execute("ALTER TABLE exercises ALTER COLUMN target_freq TYPE NUMERIC(4,2)")
-        # Migrate: merge SS into SP and delete SS
+        # Migration: merge the removed "SS" exercise into "SP" (shoulder press)
         cur.execute("SELECT 1 FROM exercises WHERE code = 'SS'")
         if cur.fetchone():
             cur.execute("UPDATE entries SET exercise_code = 'SP' WHERE exercise_code = 'SS'")

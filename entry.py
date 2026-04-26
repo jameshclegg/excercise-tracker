@@ -22,6 +22,7 @@ from datetime import date, timedelta
 from collections import OrderedDict
 from pathlib import Path
 
+# The earliest date the user started tracking exercises
 START_DATE = date(2025, 1, 3)
 DEFAULT_FILE = "data/data.txt"
 LOCK_SUFFIX = ".lock"

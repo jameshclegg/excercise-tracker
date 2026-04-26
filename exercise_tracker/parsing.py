@@ -7,6 +7,7 @@ from .db import get_db
 
 
 def get_valid_codes():
+    """Return the set of all valid exercise codes from the database."""
     conn = get_db()
     cur = conn.cursor()
     cur.execute("SELECT code FROM exercises")
@@ -29,7 +30,12 @@ def normalize_code(raw_code, valid_codes):
 
 
 def smart_split(codes_str):
-    """Split exercise entries by comma, keeping 'v a,b,c' together."""
+    """Split exercise entries by comma, keeping 'v a,b,c' together.
+
+    The 'v' (flexibility) shorthand uses commas between variant letters,
+    which would normally be split. This function detects that pattern and
+    preserves 'v a,b,c' as a single token.
+    """
     tokens = codes_str.split(",")
     result = []
     i = 0
@@ -57,7 +63,16 @@ def smart_split(codes_str):
 
 
 def parse_bulk_entry(raw_entry, valid_codes):
-    """Parse a bulk entry string into a list of (code, sets_str, weight, notes) tuples."""
+    """Parse a bulk entry string into a list of (code, sets_str, weight, notes) tuples.
+
+    Supports several shorthand forms:
+    - 'v' alone → expand to all flexibility codes VA–VE
+    - 'v a,b,c' → expand to VA, VB, VC
+    - 'v N' (N<=5) → first N flexibility codes
+    - 'CODE -W R C' → exercise at Weight, Reps × Count (e.g. 'p -13 15 3')
+    - 'CODE 15+12+10' → explicit sets in plus notation
+    - 'CODE 2/3' → fraction stored as notes ('2/3 of routine')
+    """
     items = smart_split(raw_entry)
     results = []
     for item in items:
@@ -66,6 +81,7 @@ def parse_bulk_entry(raw_entry, valid_codes):
             continue
 
         # Handle "v a,b,c" or bare "v" or "v 1" expansions
+        # 'v' is a shorthand for flexibility exercises VA through VE
         parts = item.split()
         lower0 = parts[0].lower()
         if lower0 == "v":
@@ -88,6 +104,8 @@ def parse_bulk_entry(raw_entry, valid_codes):
                 continue
             if re.match(r"^\d+$", second):
                 num = int(second)
+                # If num <= 5, treat as "first N flexibility variants" (VA..VE)
+                # If num > 5, fall through to standard parsing (e.g. reps count)
                 if num <= 5:
                     for suffix in ["A", "B", "C", "D", "E"][:num]:
                         code = f"V{suffix}"
@@ -104,12 +122,13 @@ def parse_bulk_entry(raw_entry, valid_codes):
         rest = parts[1:]
 
         idx = 0
-        # Check for weight (negative number)
+        # Check for weight: negative number prefix convention (e.g. '-13' = 13kg)
         if idx < len(rest) and re.match(r"^-\d+(\.\d+)?$", rest[idx]):
             weight = float(rest[idx][1:])
             idx += 1
 
-        # Check for sets — could be "15+12+10" or individual numbers like "15 3"
+        # Collect sets data: plus notation ('15+12+10'), individual numbers,
+        # or 'REPS COUNT' shorthand ('15 3' → '15+15+15')
         set_parts = []
         while idx < len(rest):
             token = rest[idx]
@@ -120,12 +139,16 @@ def parse_bulk_entry(raw_entry, valid_codes):
                     set_parts.append(token)
                 idx += 1
             elif re.match(r"^\d+/\d+$", token):
-                # Fraction like "2/3" → notes
+                # Fraction like '2/3' → stored as notes (partial routine)
                 notes = f"{token} of routine"
                 idx += 1
             else:
                 break
 
+        # Convert collected set_parts into the canonical plus notation:
+        # - Single plus-notation token kept as-is ('15+12+10')
+        # - Two bare numbers become reps × count ('15 3' → '15+15+15')
+        # - Otherwise join with '+' ('15+12')
         if set_parts:
             if len(set_parts) == 1 and "+" in set_parts[0]:
                 sets_str = set_parts[0]

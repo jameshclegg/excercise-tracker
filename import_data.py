@@ -58,6 +58,7 @@ WEIGHT_STATE = {}
 
 
 def load_valid_codes():
+    """Load the set of valid exercise codes from the database."""
     conn = psycopg2.connect(DATABASE_URL)
     cur = conn.cursor()
     cur.execute("SELECT code FROM exercises")
@@ -105,7 +106,7 @@ def parse_entry(raw_entry):
         letters = re.findall(r'[a-eA-E]', v_match.group(1))
         return [("V" + l.upper(), None, None, None) for l in letters]
 
-    # Handle bare 'v' or 'v 1' → expand to all V codes
+    # Handle bare 'v' or 'v 1' → expand to all flexibility codes (VA–VE)
     if re.match(r'^v\s*$', raw, re.IGNORECASE) or re.match(r'^v\s+1\s*$', raw, re.IGNORECASE):
         return [("VA", None, None, None), ("VB", None, None, None),
                 ("VC", None, None, None), ("VD", None, None, None),
@@ -126,7 +127,8 @@ def parse_entry(raw_entry):
     notes = None
 
     i = 0
-    # Check for weight (negative number)
+    # Check for weight (negative number prefix, e.g. '-13' = 13 kg).
+    # Weight is remembered per exercise code for carry-forward.
     if i < len(rest) and rest[i].startswith('-'):
         try:
             weight = abs(float(rest[i]))
@@ -176,7 +178,9 @@ def parse_entry(raw_entry):
         notes = f"{rest[i]} of routine"
         i += 1
 
-    # If no explicit weight but we have carry-forward
+    # If no explicit weight but we have a carry-forward value from a
+    # previous entry of the same exercise. Currently not applied automatically
+    # to avoid false positives with timed/bodyweight exercises.
     if weight is None and code in WEIGHT_STATE:
         # Only carry forward for codes that use weight
         # Don't carry forward for timed routines like B where '1' means '1 set'
@@ -229,8 +233,11 @@ def parse_data_file(filepath):
 
 
 def smart_split(codes_str):
-    """
-    Split a line's exercise entries by comma, but keep 'v a,b,c' together.
+    """Split a line's exercise entries by comma, but keep 'v a,b,c' together.
+
+    The flexibility shorthand 'v a,b,c' uses commas between variant letters,
+    which would be incorrectly split by a naive comma split. This function
+    detects and preserves those patterns as single tokens.
     """
     # First check if there's a 'v a,b,c' pattern anywhere
     # Replace v-patterns with a placeholder, split, then restore
@@ -290,7 +297,8 @@ def import_to_db(days, dry_run=False):
     cur = conn.cursor()
 
     try:
-        # Only delete entries for dates in data.txt, preserving web-entered data
+        # Only delete entries for dates present in data.txt, preserving any
+        # entries added via the web UI for other dates
         dates_to_import = list(days.keys())
         if dates_to_import:
             cur.execute(

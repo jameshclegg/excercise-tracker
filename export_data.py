@@ -12,10 +12,18 @@ load_dotenv()
 
 
 def get_db():
+    """Connect to the database using DATABASE_URL from environment."""
     return psycopg2.connect(os.environ["DATABASE_URL"])
 
 
 def export_data(output_file="data/data_export.txt"):
+    """Export all exercise entries, notes, and injury notes to text files.
+
+    Produces three files:
+    - data_export.txt: entries in the same 'DATE: CODE SETS' format used by import
+    - notes_export.txt: per-exercise notes
+    - injury_notes.txt: global injury notes
+    """
     conn = get_db()
     cur = conn.cursor()
     cur.execute("""

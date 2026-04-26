@@ -11,7 +11,16 @@ from .db import get_db
 
 
 def compute_stats_data():
-    """Compute all stats data. Returns a dict of template variables."""
+    """Compute all stats data for the stats page.
+
+    Returns a dict of template variables including:
+    - Daily/weekly/monthly volume charts (12-month lookback)
+    - Progress trends for exercises with 5+ entries
+    - Weight progression history
+    - Category distribution
+    - Quarterly narrative summaries
+    - Personal bests per exercise
+    """
     conn = get_db()
     cur = conn.cursor(cursor_factory=RealDictCursor)
 
@@ -28,6 +37,8 @@ def compute_stats_data():
     """)
     all_entries = cur.fetchall()
 
+    # Daily entry counts for the heatmap calendar — 12-month lookback,
+    # excluding music since it's a different activity type
     cur.execute("""
         SELECT date, COUNT(*) as count
         FROM entries e
@@ -55,6 +66,8 @@ def compute_stats_data():
         if label not in daily_exercises[d]:
             daily_exercises[d].append(label)
 
+    # Weekly volume grouped by category — uses ISO week (IYYY-IW) for
+    # consistent Monday-start weeks; keyed by first date for chart labelling
     cur.execute("""
         SELECT TO_CHAR(e.date, 'IYYY-IW') as year_week,
                MIN(e.date) as week_start,
@@ -73,6 +86,7 @@ def compute_stats_data():
             weekly_volume[wk] = {}
         weekly_volume[wk][r["category"]] = r["count"]
 
+    # Monthly entry totals for the long-term volume chart
     cur.execute("""
         SELECT TO_CHAR(date, 'YYYY-MM') as month, COUNT(*) as count
         FROM entries GROUP BY month ORDER BY month
@@ -105,6 +119,8 @@ def compute_stats_data():
             timeline_data[code] = []
         timeline_data[code].append(entry["date"].isoformat())
 
+    # Build progress data: track total reps/distance/duration per session
+    # for exercises that have numeric sets data
     progress_data = {}
     for entry in all_entries:
         code = entry["exercise_code"]
@@ -130,10 +146,11 @@ def compute_stats_data():
         progress_data[code]["dates"].append(entry["date"].isoformat())
         progress_data[code]["values"].append(value)
 
+    # Require at least 5 data points to show a meaningful progress trend
     progress_data = {k: v for k, v in progress_data.items() if len(v["dates"]) >= 5}
 
-    # Weight progression data: include all entries for exercises that ever had added weight
-    # Entries without weight are treated as 0
+    # Weight progression: include all entries for exercises that have ever used
+    # added weight. Entries without a weight value are treated as bodyweight (0 kg).
     weight_ever = set()
     for entry in all_entries:
         w = entry["weight"]
@@ -151,6 +168,7 @@ def compute_stats_data():
             weight_progress[code] = {"dates": [], "weights": []}
         weight_progress[code]["dates"].append(d)
         weight_progress[code]["weights"].append(w)
+    # Need at least 2 data points to plot a weight progression line
     weight_progress = {k: v for k, v in weight_progress.items() if len(v["dates"]) >= 2}
 
     today = date.today()
@@ -168,8 +186,11 @@ def compute_stats_data():
             "days_since": days_since,
         })
 
+    # Sort exercises by most recently done first
     exercise_stats.sort(key=lambda x: x["days_since"], reverse=False)
 
+    # --- Quarterly narrative generation ---
+    # Group entries into calendar quarters for trend summaries
     quarterly_entries = defaultdict(list)
     for entry in all_entries:
         m = entry["date"].month
@@ -179,7 +200,7 @@ def compute_stats_data():
 
     quarter_labels = {1: "Jan–Mar", 2: "Apr–Jun", 3: "Jul–Sep", 4: "Oct–Dec"}
     quarterly_narratives = []
-    prev_quarter_codes = set()
+    prev_quarter_codes = set()  # tracks exercises from prior quarter for new/dropped detection
     for q_key in sorted(quarterly_entries.keys()):
         entries = quarterly_entries[q_key]
         year, q_num = q_key.split("-Q")
@@ -203,6 +224,9 @@ def compute_stats_data():
         new_exercises = current_codes - prev_quarter_codes if prev_quarter_codes else set()
         dropped = prev_quarter_codes - current_codes if prev_quarter_codes else set()
 
+        # Detect progress within this quarter: compare first vs last value.
+        # Require at least 3 entries for a meaningful trend.
+        # A >=10% rise is "improved"; a >=10% drop is "decreased".
         progress_notes = []
         q_month_prefixes = []
         q_int = int(q_num)
@@ -220,6 +244,7 @@ def compute_stats_data():
             if len(q_values) >= 3:
                 first_val = q_values[0]
                 last_val = q_values[-1]
+                # 10% threshold avoids flagging minor fluctuations
                 if last_val > first_val * 1.1:
                     unit = "km" if pd["input_type"] == "distance" else "min" if pd["input_type"] == "minutes" else "reps" if pd["input_type"] == "reps_sets" else "sec"
                     name = escape(exercise_map[code]["name"]) if code in exercise_map else code
@@ -261,6 +286,12 @@ def compute_stats_data():
 
         prev_quarter_codes = current_codes
 
+    # --- Personal bests ---
+    # For each exercise, find the single best performance:
+    #   reps_sets: highest total reps (sum of all sets)
+    #   time_sets: longest single hold (max of sets)
+    #   distance: longest distance
+    #   minutes: longest duration
     personal_bests = []
     for entry in all_entries:
         code = entry["exercise_code"]
@@ -297,6 +328,7 @@ def compute_stats_data():
             "date": entry["date"].isoformat(),
         })
 
+    # Keep only the single best record per exercise
     best_map = {}
     for pb in personal_bests:
         code = pb["code"]

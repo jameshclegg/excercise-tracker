@@ -15,6 +15,7 @@ bp = Blueprint("api", __name__, url_prefix="/api")
 @bp.route("/exercises")
 @require_login
 def exercises():
+    """Return all exercises as JSON, ordered by code."""
     conn = get_db()
     cur = conn.cursor(cursor_factory=RealDictCursor)
     cur.execute("SELECT * FROM exercises ORDER BY code")
@@ -25,6 +26,7 @@ def exercises():
 @bp.route("/notes", methods=["GET"])
 @require_login
 def get_notes():
+    """Return all exercise notes as JSON."""
     conn = get_db()
     cur = conn.cursor(cursor_factory=RealDictCursor)
     cur.execute("SELECT exercise_code, notes, updated_at FROM exercise_notes ORDER BY exercise_code")
@@ -35,6 +37,10 @@ def get_notes():
 @bp.route("/notes", methods=["POST"])
 @require_login
 def save_note():
+    """Create or update an exercise note. Deletes the note if text is blank.
+
+    Expects JSON: {"exercise_code": "P", "notes": "Focus on form"}
+    """
     data = request.get_json()
     code = data.get("exercise_code", "").strip()
     notes_text = data.get("notes", "").strip()
@@ -46,6 +52,8 @@ def save_note():
 
     conn = get_db()
     cur = conn.cursor()
+    # Upsert when there's text; delete the row entirely when blank
+    # to keep the table clean (no empty-note rows)
     if notes_text:
         cur.execute("""
             INSERT INTO exercise_notes (exercise_code, notes, updated_at)
@@ -62,6 +70,7 @@ def save_note():
 @bp.route("/injury-notes", methods=["GET"])
 @require_login
 def get_injury_notes():
+    """Return the global injury notes (singleton row, id=1)."""
     conn = get_db()
     cur = conn.cursor()
     cur.execute("SELECT notes FROM injury_notes WHERE id = 1")
@@ -72,6 +81,7 @@ def get_injury_notes():
 @bp.route("/injury-notes", methods=["POST"])
 @require_login
 def save_injury_notes():
+    """Upsert the global injury notes (singleton row, id=1)."""
     data = request.get_json()
     notes_text = data.get("notes", "").strip()
     conn = get_db()
@@ -89,6 +99,12 @@ def save_injury_notes():
 @bp.route("/recent/<code>")
 @require_login
 def recent(code):
+    """Return recent history for a single exercise, grouped by date.
+
+    Fetches the last 10 entries and groups them into the 3 most recent
+    dates. Response includes exercise name, per-date entry details,
+    and any saved exercise notes.
+    """
     valid_codes = get_valid_codes()
     if code not in valid_codes:
         return jsonify({"error": "unknown exercise code"}), 404
@@ -105,7 +121,8 @@ def recent(code):
     rows = cur.fetchall()
     cur.execute("SELECT notes FROM exercise_notes WHERE exercise_code = %s", (code,))
     notes_row = cur.fetchone()
-    # Group by date (most recent 3 dates)
+    # Group by date, keeping only the 3 most recent dates to avoid
+    # overwhelming the popup with old data
     by_date = OrderedDict()
     for r in rows:
         d = r["date"].isoformat()

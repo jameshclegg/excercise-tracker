@@ -54,6 +54,15 @@ def _collapse_sets(sets_str):
 
 @bp.route("/telegram/webhook", methods=["POST"])
 def telegram_webhook():
+    """Handle incoming Telegram bot messages.
+
+    Supports:
+    - Bot commands: /today, /recent, /plan, /todo, /slipping, /codes, /recentw
+    - Per-exercise queries: 'P /recent', 'P /notes'
+    - Weight logging: a decimal like '74.5' is saved as today's weight
+    - Exercise logging: parsed via parse_bulk_entry (e.g. 'p -13 5 4, a 1')
+    - Test mode: append '/test' to preview without saving
+    """
     if not TELEGRAM_BOT_TOKEN:
         return jsonify({"ok": False, "error": "Bot not configured"}), 500
 
@@ -68,18 +77,21 @@ def telegram_webhook():
     if not text:
         return jsonify({"ok": True})
 
-    # Restrict to authorized user (if configured)
+    # Chat-ID authorization: if TELEGRAM_CHAT_ID is configured, only that
+    # user's messages are processed. Others are silently ignored (no error
+    # leak). If not yet configured, echo the chat ID so the user can set it.
     if TELEGRAM_CHAT_ID and chat_id != TELEGRAM_CHAT_ID:
-        return jsonify({"ok": True})  # silently ignore
+        return jsonify({"ok": True})
 
-    # If chat ID not configured yet, echo it so user can set it up
+    # Bootstrap: if no chat ID is configured yet, tell the user their ID
+    # so they can add it as an env var to lock the bot to their account
     if not TELEGRAM_CHAT_ID:
         telegram_reply(chat_id, f"👋 Your chat ID is: {chat_id}\n"
                        "Add this as TELEGRAM_CHAT_ID in your environment variables, "
                        "then restart the app to lock the bot to your account.")
         # Still process the message
 
-    # Handle bot commands
+    # Handle bot commands (slash-prefixed)
     if text.startswith("/"):
         lower = text.lower().strip()
         if lower in ("/todo", "/todo@" + TELEGRAM_BOT_TOKEN.split(":")[0] if TELEGRAM_BOT_TOKEN else ""):
@@ -145,7 +157,8 @@ def telegram_webhook():
             if not rows:
                 telegram_reply(chat_id, f"📅 No exercises recorded for today ({today_str}).")
             else:
-                # Sort by least recently done previously (most neglected first)
+                # Sort by least recently done previously — surfaces the most
+                # neglected exercises first so the user sees what matters
                 rows.sort(key=lambda r: r["prev_date"] or date.min)
                 lines = [f"📅 Today ({today_str}):\n"]
                 for r in rows:
@@ -178,7 +191,7 @@ def telegram_webhook():
                 telegram_reply(chat_id, "📊 No exercises in the last 7 days.")
                 return jsonify({"ok": True})
 
-            # Group by date
+            # Group entries by date for a day-by-day summary
             by_date = defaultdict(list)
             for r in rows:
                 by_date[r["date"]].append(r)
@@ -197,7 +210,7 @@ def telegram_webhook():
                         unique_codes.append(c)
                 lines.append(f"  {day_label}: {', '.join(unique_codes)}")
 
-            # Group by exercise
+            # Also group by exercise for an alternative view
             by_exercise = defaultdict(list)
             for r in rows:
                 by_exercise[r["exercise_code"]].append(r)
@@ -385,7 +398,8 @@ def telegram_webhook():
             telegram_reply(chat_id, f"📝 {code} — {name}\n\nNo notes.")
         return jsonify({"ok": True})
 
-    # Check for /test suffix
+    # Check for '/test' suffix — allows previewing what would be saved
+    # without actually committing to the database
     test_mode = False
     if text.lower().endswith("/test"):
         test_mode = True
@@ -394,7 +408,7 @@ def telegram_webhook():
     today_str = date.today().isoformat()
     test_label = " [TEST MODE — not saved]" if test_mode else ""
 
-    # Try weight first
+    # Try weight entry first (a bare decimal like '74.5')
     weight = parse_weight(text)
     if weight is not None:
         try:
@@ -405,13 +419,14 @@ def telegram_webhook():
                     "ON CONFLICT (date) DO UPDATE SET weight = EXCLUDED.weight",
                     (today_str, weight),
                 )
+            # In test mode, rollback the transaction so nothing is persisted
                 if test_mode:
                     conn.rollback()
                 else:
                     conn.commit()
             telegram_reply(chat_id, f"⚖️ Understood {weight} as weight {weight} kg.\n"
                            f"Posted to weight tracker for {today_str}.{test_label}")
-            # Wake up the weight tracker app so it's ready when visited
+            # Ping the weight tracker app to wake it from cold start
             if WEIGHT_TRACKER_URL and not test_mode:
                 try:
                     urllib.request.urlopen(WEIGHT_TRACKER_URL, timeout=5)
@@ -421,7 +436,7 @@ def telegram_webhook():
             telegram_reply(chat_id, f"❌ Error saving weight: {e}")
         return jsonify({"ok": True})
 
-    # Try exercise entry
+    # Fall through: try parsing as exercise entries (e.g. 'p -13 5 4, a 1')
     try:
         valid_codes = get_valid_codes()
         parsed = parse_bulk_entry(text, valid_codes)
@@ -439,6 +454,8 @@ def telegram_webhook():
                            "Or exercises like: p -13 5 4, a 1, vb")
             return jsonify({"ok": True})
 
+        # Use a transaction so all entries succeed or fail together.
+        # In test mode, rollback after building the summary.
         summaries = []
         with get_db_transaction() as conn:
             cur = conn.cursor()

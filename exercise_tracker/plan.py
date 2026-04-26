@@ -6,7 +6,9 @@ from psycopg2.extras import RealDictCursor
 
 from .db import get_db
 
-DORMANT_DAYS = 35  # 5 weeks
+# Exercises not done for 5+ weeks are considered dormant (abandoned)
+# and excluded from to-do/slipping lists to reduce noise
+DORMANT_DAYS = 35
 
 
 def compute_plan_data():
@@ -48,6 +50,8 @@ def compute_plan_data():
         if days_since >= DORMANT_DAYS:
             continue  # dormant
 
+        # Derive the expected interval from target frequency:
+        # e.g. freq=2 means twice/week → interval=3.5 days
         interval = 7.0 / float(freq)
 
         if days_since >= 14:

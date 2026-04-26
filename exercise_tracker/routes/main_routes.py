@@ -19,6 +19,12 @@ bp = Blueprint("main", __name__)
 @bp.route("/")
 @require_login
 def index():
+    """Render the main desktop dashboard.
+
+    Shows today's (or selected date's) entries, the exercise catalogue,
+    stats summaries, and the to-do/slipping plan. The date picker defaults
+    to today and shows the 14 most recent dates that have entries.
+    """
     conn = get_db()
     cur = conn.cursor(cursor_factory=RealDictCursor)
     cur.execute("SELECT * FROM exercises ORDER BY code")
@@ -38,7 +44,7 @@ def index():
     )
     entries = cur.fetchall()
 
-    # Recent dates with entries
+    # Show the 14 most recent dates that have entries for the date picker sidebar
     cur.execute(
         """
         SELECT DISTINCT date FROM entries
@@ -68,6 +74,11 @@ def index():
 @bp.route("/m")
 @require_login
 def mobile():
+    """Render the mobile-friendly entry view.
+
+    Simplified version of index() — shows only the exercise list and
+    entries for the selected date, without stats or plan data.
+    """
     conn = get_db()
     cur = conn.cursor(cursor_factory=RealDictCursor)
     cur.execute("SELECT * FROM exercises ORDER BY code")
@@ -102,6 +113,13 @@ def mobile():
 @bp.route("/add", methods=["POST"])
 @require_login
 def add_entry():
+    """Parse and save bulk exercise entries for a given date.
+
+    Accepts a 'bulk' text field with comma-separated exercise shorthand
+    (e.g. 'p -13 15 3, a 1, v'). Each entry is parsed, validated against
+    the exercise catalogue, and inserted. Redirects back to the referring
+    page with the date preserved in the query string.
+    """
     bulk_text = request.form.get("bulk", "").strip()
     entry_date = request.form.get("date", date.today().isoformat())
 
@@ -129,6 +147,8 @@ def add_entry():
         elif count > 0:
             flash(f"Added {count} entries")
 
+    # Redirect back to whichever page submitted the form (/ or /m),
+    # preserving the selected date in the query string
     redirect_to = request.form.get("redirect", "/")
     return redirect(f"{redirect_to}?date={entry_date}")
 
@@ -136,6 +156,7 @@ def add_entry():
 @bp.route("/delete/<int:entry_id>", methods=["POST"])
 @require_login
 def delete_entry(entry_id):
+    """Delete a single exercise entry by ID and redirect back."""
     entry_date = request.form.get("date", date.today().isoformat())
     conn = get_db()
     cur = conn.cursor()
@@ -148,4 +169,5 @@ def delete_entry(entry_id):
 @bp.route("/stats")
 @require_login
 def stats():
+    """Render the full statistics page with charts and narratives."""
     return render_template("stats.html", **compute_stats_data())
