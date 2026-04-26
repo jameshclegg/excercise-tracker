@@ -4,7 +4,11 @@ import os
 
 DATABASE_URL = os.environ.get("DATABASE_URL", "")
 PASSWORD_HASH = os.environ.get("TIMELINE_PASSWORD", "")
-SECRET_KEY = os.environ.get("SECRET_KEY", "dev-secret")
+SECRET_KEY = os.environ.get("SECRET_KEY", "")
+if not SECRET_KEY:
+    import warnings
+    warnings.warn("SECRET_KEY not set — using random key (sessions won't persist across restarts)")
+    SECRET_KEY = os.urandom(32).hex()
 EXERCISES_FILE = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "exercises.txt")
 
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")

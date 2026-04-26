@@ -322,20 +322,20 @@
                     container.innerHTML = '<p style="color:#888;">No entries found for ' + code + '</p>';
                     return;
                 }
-                let html = '<p style="color:#00d4ff; font-weight:600; margin-bottom:8px;">' + code + ' — ' + data.name + '</p>';
+                let html = '<p style="color:#00d4ff; font-weight:600; margin-bottom:8px;">' + escapeHtml(code) + ' — ' + escapeHtml(data.name) + '</p>';
                 dates.forEach(d => {
                     html += '<div style="background:#1a1a2e; border-radius:6px; padding:8px 12px; margin-bottom:6px;">';
-                    html += '<strong style="color:#ccc;">' + d + '</strong>';
+                    html += '<strong style="color:#ccc;">' + escapeHtml(d) + '</strong>';
                     data.dates[d].forEach(e => {
                         html += '<span style="margin-left:12px; color:#aaa;">';
                         if (e.sets) {
-                            if (e.input_type === 'distance') html += e.sets + ' km';
-                            else if (e.input_type === 'minutes') html += e.sets + ' min';
-                            else if (e.input_type === 'reps_sets') html += e.sets + ' reps' + (e.weight ? ' @ ' + e.weight + 'kg' : '');
-                            else if (e.input_type === 'time_sets') html += e.sets + 's' + (e.weight ? ' @ ' + e.weight + 'kg' : '');
-                            else html += e.sets;
+                            if (e.input_type === 'distance') html += escapeHtml(e.sets) + ' km';
+                            else if (e.input_type === 'minutes') html += escapeHtml(e.sets) + ' min';
+                            else if (e.input_type === 'reps_sets') html += escapeHtml(e.sets) + ' reps' + (e.weight ? ' @ ' + escapeHtml(String(e.weight)) + 'kg' : '');
+                            else if (e.input_type === 'time_sets') html += escapeHtml(e.sets) + 's' + (e.weight ? ' @ ' + escapeHtml(String(e.weight)) + 'kg' : '');
+                            else html += escapeHtml(e.sets);
                         } else { html += '✓ Done'; }
-                        if (e.notes) html += ' <span style="color:#666;">(' + e.notes + ')</span>';
+                        if (e.notes) html += ' <span style="color:#666;">(' + escapeHtml(e.notes) + ')</span>';
                         html += '</span>';
                     });
                     html += '</div>';
@@ -343,7 +343,7 @@
                 if (data.exercise_notes) {
                     html += '<div style="background:#0f3460; border-radius:6px; padding:8px 12px; margin-top:8px; border-left:3px solid #f39c12;">';
                     html += '<span style="color:#f39c12; font-size:0.8rem;">📝 Notes:</span> ';
-                    html += '<span style="color:#ccc;">' + data.exercise_notes.replace(/\n/g, '<br>') + '</span></div>';
+                    html += '<span style="color:#ccc;">' + escapeHtml(data.exercise_notes).replace(/\n/g, '<br>') + '</span></div>';
                 }
                 container.innerHTML = html;
             } catch(err) {
@@ -559,6 +559,12 @@
     </div>
 
     <script>
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
         const dailyCounts = {{ daily_counts_json|safe }};
         const dailyExercises = {{ daily_exercises_json|safe }};
         const timelineData = {{ timeline_json|safe }};
@@ -1126,7 +1132,7 @@
                     const card = document.createElement('div');
                     card.className = 'progress-card';
                     const cid = `wprog-${code}-${months}`;
-                    card.innerHTML = `<h3>${ex.code} — ${ex.name} <span style="color:#888;font-weight:400;font-size:0.75rem;">(kg)</span></h3>
+                    card.innerHTML = `<h3>${escapeHtml(ex.code)} — ${escapeHtml(ex.name)} <span style="color:#888;font-weight:400;font-size:0.75rem;">(kg)</span></h3>
                                       <canvas id="${cid}" height="160"></canvas>`;
                     weightGrid.appendChild(card);
                     chartInstances.push(new Chart(document.getElementById(cid), {
@@ -1164,7 +1170,7 @@
                     const card = document.createElement('div');
                     card.className = 'progress-card';
                     const cid = `prog-${code}-${months}`;
-                    card.innerHTML = `<h3>${ex.code} — ${ex.name} <span style="color:#888;font-weight:400;font-size:0.75rem;">(${unitLabel})</span></h3>
+                    card.innerHTML = `<h3>${escapeHtml(ex.code)} — ${escapeHtml(ex.name)} <span style="color:#888;font-weight:400;font-size:0.75rem;">(${escapeHtml(unitLabel)})</span></h3>
                                       <canvas id="${cid}" height="160"></canvas>`;
                     grid.appendChild(card);
                     chartInstances.push(new Chart(document.getElementById(cid), {
@@ -1288,7 +1294,7 @@
                         const name = exMap[code] || code;
                         const text = notesCache[code].replace(/</g, '&lt;').replace(/\n/g, '<br>');
                         return `<div style="margin-bottom:12px; padding:8px 12px; background:#1a1a2e; border-left:3px solid #00b4d8; border-radius:4px;">
-                            <strong style="color:#00b4d8;">${code} — ${name}</strong><br>
+                            <strong style="color:#00b4d8;">${escapeHtml(code)} — ${escapeHtml(name)}</strong><br>
                             <span style="color:#ccc;">${text}</span>
                         </div>`;
                     }).join('');
