@@ -274,14 +274,16 @@
             isometric: '#f39c12',
             skill: '#9b59b6',
             fitness: '#2ecc71',
-            flexibility: '#3498db'
+            flexibility: '#3498db',
+            physio: '#1abc9c'
         };
         const catColorsBg = {
             strength: 'rgba(231,76,60,0.2)',
             isometric: 'rgba(243,156,18,0.2)',
             skill: 'rgba(155,89,182,0.2)',
             fitness: 'rgba(46,204,113,0.2)',
-            flexibility: 'rgba(52,152,219,0.2)'
+            flexibility: 'rgba(52,152,219,0.2)',
+            physio: 'rgba(26,188,156,0.2)'
         };
 
         // Chart.js defaults for dark theme
@@ -425,7 +427,7 @@
                 target[ex.category].push(ex);
             });
 
-            const categoryOrder = ['strength', 'isometric', 'skill', 'fitness', 'flexibility'];
+            const categoryOrder = ['strength', 'isometric', 'skill', 'fitness', 'flexibility', 'physio'];
 
             const bodyAreaOrder = ['back', 'chest', 'arms', 'legs', 'core'];
 
@@ -564,7 +566,7 @@
                 byCategory[ex.category].push(ex);
             });
 
-            const categoryOrder = ['strength', 'isometric', 'skill', 'fitness', 'flexibility'];
+            const categoryOrder = ['strength', 'isometric', 'skill', 'fitness', 'flexibility', 'physio'];
             const bodyAreaOrder2 = ['back', 'chest', 'arms', 'legs', 'core'];
 
             function renderDensityRow(ex, cat) {
@@ -653,7 +655,7 @@
         // ===== 3. WEEKLY VOLUME (stacked bar) =====
         (function() {
             const weeks = Object.keys(weeklyVolume).sort();
-            const categories = ['strength', 'isometric', 'skill', 'fitness', 'flexibility'];
+            const categories = ['strength', 'isometric', 'skill', 'fitness', 'flexibility', 'physio'];
 
             const datasets = categories.map(cat => ({
                 label: cat.charAt(0).toUpperCase() + cat.slice(1),
