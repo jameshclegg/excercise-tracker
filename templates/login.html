@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
     <title>Exercise Tracker - Login</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -28,7 +28,7 @@
         <p class="flash">{{ msg }}</p>
         {% endfor %}
         <form method="POST">
-            <input type="password" name="password" placeholder="Password" autocomplete="current-password" autofocus>
+            <input type="password" name="password" placeholder="Password" aria-label="Password" autocomplete="current-password" autofocus>
             <button type="submit">Log In</button>
         </form>
     </div>

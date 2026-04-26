@@ -23,6 +23,17 @@ def create_app():
     # Auto-close DB connections after each request
     app.teardown_appcontext(close_db)
 
+    # Security headers
+    @app.after_request
+    def set_security_headers(response):
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["X-XSS-Protection"] = "1; mode=block"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        if not app.debug:
+            response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+        return response
+
     # Register blueprints
     from .routes.auth_routes import bp as auth_bp
     from .routes.main_routes import bp as main_bp

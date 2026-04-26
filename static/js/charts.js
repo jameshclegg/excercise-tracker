@@ -1,4 +1,4 @@
-/* Shared chart utilities and rendering ΓÇö used by both index.html and stats.html */
+﻿/* Shared chart utilities and rendering ΓÇö used by both index.html and stats.html */
 
 function escapeHtml(text) {
     const div = document.createElement('div');
@@ -6,25 +6,26 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
+// Read category colors from CSS custom properties (single source of truth in shared.css)
+const _rootStyle = getComputedStyle(document.documentElement);
+function cssVar(name) { return _rootStyle.getPropertyValue(name).trim(); }
+
 const catColors = {
-    strength: '#e74c3c',
-    isometric: '#f39c12',
-    skill: '#9b59b6',
-    fitness: '#2ecc71',
-    flexibility: '#3498db',
-    physio: '#1abc9c',
-    music: '#e91e63'
+    strength: cssVar('--cat-strength'),
+    isometric: cssVar('--cat-isometric'),
+    skill: cssVar('--cat-skill'),
+    fitness: cssVar('--cat-fitness'),
+    flexibility: cssVar('--cat-flexibility'),
+    physio: cssVar('--cat-physio'),
+    music: cssVar('--cat-music')
 };
 
-const catColorsBg = {
-    strength: 'rgba(231,76,60,0.2)',
-    isometric: 'rgba(243,156,18,0.2)',
-    skill: 'rgba(155,89,182,0.2)',
-    fitness: 'rgba(46,204,113,0.2)',
-    flexibility: 'rgba(52,152,219,0.2)',
-    physio: 'rgba(26,188,156,0.2)',
-    music: 'rgba(233,30,99,0.2)'
-};
+const catColorsBg = Object.fromEntries(
+    Object.entries(catColors).map(([k, v]) => {
+        const r = parseInt(v.slice(1,3),16), g = parseInt(v.slice(3,5),16), b = parseInt(v.slice(5,7),16);
+        return [k, `rgba(${r},${g},${b},0.2)`];
+    })
+);
 
 const categoryOrder = ['strength', 'isometric', 'skill', 'fitness', 'flexibility', 'physio', 'music'];
 
@@ -205,10 +206,10 @@ function initProgressCharts(opts) {
             chartInstances.push(new Chart(document.getElementById(cid), {
                 type: 'line',
                 data: { datasets: [
-                    { label: 'Weight (kg)', data: toXY(f.dates, f.values), borderColor: '#f39c12',
-                      backgroundColor: 'rgba(243,156,18,0.15)', fill: true, tension: 0.3,
+                    { label: 'Weight (kg)', data: toXY(f.dates, f.values), borderColor: catColors.isometric,
+                      backgroundColor: catColorsBg.isometric, fill: true, tension: 0.3,
                       pointRadius: 3, pointHoverRadius: 6, borderWidth: 2 },
-                    { label: 'Trend', data: toXY(f.dates, makeTrend(f.values, 4)), borderColor: '#00d4ff',
+                    { label: 'Trend', data: toXY(f.dates, makeTrend(f.values, 4)), borderColor: cssVar('--text-accent'),
                       borderDash: [5, 3], pointRadius: 0, borderWidth: 1.5, fill: false }
                 ]},
                 options: { responsive: true,

@@ -7,6 +7,7 @@ from psycopg2.extras import RealDictCursor
 
 from ..auth import require_login
 from ..db import get_db
+from ..parsing import get_valid_codes
 
 bp = Blueprint("api", __name__, url_prefix="/api")
 
@@ -39,6 +40,9 @@ def save_note():
     notes_text = data.get("notes", "").strip()
     if not code:
         return jsonify({"error": "exercise_code required"}), 400
+    valid_codes = get_valid_codes()
+    if code not in valid_codes:
+        return jsonify({"error": "unknown exercise code"}), 404
 
     conn = get_db()
     cur = conn.cursor()
@@ -85,6 +89,9 @@ def save_injury_notes():
 @bp.route("/recent/<code>")
 @require_login
 def recent(code):
+    valid_codes = get_valid_codes()
+    if code not in valid_codes:
+        return jsonify({"error": "unknown exercise code"}), 404
     conn = get_db()
     cur = conn.cursor(cursor_factory=RealDictCursor)
     cur.execute("""

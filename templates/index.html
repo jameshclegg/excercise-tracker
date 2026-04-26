@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
     <title>Exercise Tracker</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -100,8 +100,7 @@
                     <label>Date</label>
                     <div style="display:flex; gap:6px; align-items:center;">
                         <input type="date" id="dateInput" name="date" value="{{ selected_date }}"
-                               style="min-width:160px;"
-                               onchange="document.getElementById('dateGo').click()">
+                               style="min-width:160px;">
                         <a href="/?date={{ next_date }}" style="padding:6px 12px; background:#0f3460; border-radius:6px; font-weight:600; color:#00d4ff; text-decoration:none; white-space:nowrap;">+1</a>
                     </div>
                 </div>
@@ -171,7 +170,7 @@
                 <td>{{ e.notes or '—' }}</td>
                 <td>
                     <form method="POST" action="/delete/{{ e.id }}" style="display:inline"
-                          onsubmit="return confirm('Delete?')">
+                          class="delete-form">
                         <input type="hidden" name="date" value="{{ selected_date }}">
                         <input type="hidden" name="redirect" value="/">
                         <button class="delete-btn">✕</button>
@@ -220,8 +219,8 @@
         <h2>🔍 Recent History</h2>
         <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
             <input type="text" id="recentSearch" list="exerciseList" placeholder="Type or select exercise…"
-                   style="padding:8px; background:#1a1a2e; color:#eee; border:1px solid #333; border-radius:4px; min-width:250px;"
-                   onchange="lookupRecent(this.value)" onkeydown="if(event.key==='Enter'){lookupRecent(this.value);event.preventDefault();}">
+                   aria-label="Search exercise for recent history"
+                   style="padding:8px; background:#1a1a2e; color:#eee; border:1px solid #333; border-radius:4px; min-width:250px;">
             <datalist id="exerciseList">
                 {% for ex in exercises %}
                 <option value="{{ ex.code }}">{{ ex.code }} — {{ ex.name }}</option>
@@ -337,12 +336,12 @@
                     <textarea id="noteText" rows="4" style="width:100%; padding:8px; background:#1a1a2e; color:#eee; border:1px solid #333; border-radius:4px; font-family:inherit; resize:vertical;" placeholder="Select an exercise to view/edit notes…"></textarea>
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-top:6px;">
                         <span id="noteSaveStatus" style="font-size:0.8rem; color:#666;"></span>
-                        <button id="noteSaveBtn" onclick="saveNote()" style="padding:6px 16px; background:#00b4d8; color:#000; border:none; border-radius:4px; cursor:pointer; font-weight:bold;" disabled>Save</button>
+                        <button id="noteSaveBtn" style="padding:6px 16px; background:#00b4d8; color:#000; border:none; border-radius:4px; cursor:pointer; font-weight:bold;" disabled>Save</button>
                     </div>
                 </div>
             </div>
             <div style="margin-top:10px;">
-                <button id="toggleAllNotes" onclick="toggleAllNotes()" style="padding:6px 16px; background:#333; color:#eee; border:1px solid #555; border-radius:4px; cursor:pointer;">View All Notes</button>
+                <button id="toggleAllNotes" style="padding:6px 16px; background:#333; color:#eee; border:1px solid #555; border-radius:4px; cursor:pointer;">View All Notes</button>
             </div>
             <div id="allNotesDisplay" style="display:none; margin-top:12px;"></div>
         </div>
@@ -353,7 +352,7 @@
             <textarea id="injuryText" rows="5" style="width:100%; padding:8px; background:#1a1a2e; color:#eee; border:1px solid #333; border-radius:4px; font-family:inherit; resize:vertical;" placeholder="Record any injuries, niggles, or things to watch out for…"></textarea>
             <div style="display:flex; justify-content:space-between; align-items:center; margin-top:6px;">
                 <span id="injurySaveStatus" style="font-size:0.8rem; color:#666;"></span>
-                <button onclick="saveInjuryNotes()" style="padding:6px 16px; background:#00b4d8; color:#000; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">Save</button>
+                <button id="injurySaveBtn" style="padding:6px 16px; background:#00b4d8; color:#000; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">Save</button>
             </div>
         </div>
 
@@ -617,6 +616,34 @@
                 status.style.color = '#f44';
             }
         }
+
+        // Event listeners (replacing inline handlers)
+        document.addEventListener('DOMContentLoaded', function() {
+            var dateInput = document.getElementById('dateInput');
+            if (dateInput) {
+                dateInput.addEventListener('change', function() {
+                    document.getElementById('dateGo').click();
+                });
+            }
+            var recentSearch = document.getElementById('recentSearch');
+            if (recentSearch) {
+                recentSearch.addEventListener('change', function() { lookupRecent(this.value); });
+                recentSearch.addEventListener('keydown', function(e) {
+                    if (e.key === 'Enter') { lookupRecent(this.value); e.preventDefault(); }
+                });
+            }
+            var noteSaveBtn = document.getElementById('noteSaveBtn');
+            if (noteSaveBtn) noteSaveBtn.addEventListener('click', saveNote);
+            var toggleBtn = document.getElementById('toggleAllNotes');
+            if (toggleBtn) toggleBtn.addEventListener('click', toggleAllNotes);
+            var injuryBtn = document.getElementById('injurySaveBtn');
+            if (injuryBtn) injuryBtn.addEventListener('click', saveInjuryNotes);
+            document.querySelectorAll('.delete-form').forEach(function(form) {
+                form.addEventListener('submit', function(e) {
+                    if (!confirm('Delete?')) e.preventDefault();
+                });
+            });
+        });
     </script>
 </body>
 </html>

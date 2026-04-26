@@ -4,6 +4,7 @@ import json
 from collections import defaultdict
 from datetime import date
 
+from markupsafe import escape
 from psycopg2.extras import RealDictCursor
 
 from .db import get_db
@@ -191,7 +192,7 @@ def compute_stats_data():
             active_days.add(e["date"])
 
         top = sorted(code_counts.items(), key=lambda x: x[1], reverse=True)
-        top_names = [f"{exercise_map[c]['name']} ({n}x)" for c, n in top[:7] if c in exercise_map]
+        top_names = [f"{escape(exercise_map[c]['name'])} ({n}x)" for c, n in top[:7] if c in exercise_map]
 
         cat_counts = defaultdict(int)
         for e in entries:
@@ -221,13 +222,13 @@ def compute_stats_data():
                 last_val = q_values[-1]
                 if last_val > first_val * 1.1:
                     unit = "km" if pd["input_type"] == "distance" else "min" if pd["input_type"] == "minutes" else "reps" if pd["input_type"] == "reps_sets" else "sec"
-                    name = exercise_map[code]["name"] if code in exercise_map else code
+                    name = escape(exercise_map[code]["name"]) if code in exercise_map else code
                     progress_notes.append(
                         f"{name} improved from {first_val:.0f} to {last_val:.0f} {unit}"
                     )
                 elif last_val < first_val * 0.9:
                     unit = "km" if pd["input_type"] == "distance" else "min" if pd["input_type"] == "minutes" else "reps" if pd["input_type"] == "reps_sets" else "sec"
-                    name = exercise_map[code]["name"] if code in exercise_map else code
+                    name = escape(exercise_map[code]["name"]) if code in exercise_map else code
                     progress_notes.append(
                         f"{name} decreased from {first_val:.0f} to {last_val:.0f} {unit}"
                     )
@@ -235,15 +236,15 @@ def compute_stats_data():
         parts = []
         parts.append(f"You trained on <strong>{len(active_days)}</strong> days with "
                      f"<strong>{len(entries)}</strong> total exercise entries.")
-        parts.append(f"Most focus was on <strong>{dominant_cat}</strong>. "
+        parts.append(f"Most focus was on <strong>{escape(dominant_cat)}</strong>. "
                      f"Top exercises: {', '.join(top_names)}.")
 
         if new_exercises:
-            new_names = [exercise_map[c]["name"] for c in new_exercises if c in exercise_map]
+            new_names = [str(escape(exercise_map[c]["name"])) for c in new_exercises if c in exercise_map]
             if new_names:
                 parts.append(f"🆕 Started: {', '.join(sorted(new_names)[:6])}.")
         if dropped:
-            drop_names = [exercise_map[c]["name"] for c in dropped if c in exercise_map]
+            drop_names = [str(escape(exercise_map[c]["name"])) for c in dropped if c in exercise_map]
             if drop_names and len(drop_names) <= 10:
                 parts.append(f"⏸️ Paused: {', '.join(sorted(drop_names)[:6])}.")
 

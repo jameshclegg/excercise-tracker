@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
     <title>Exercise Tracker</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -141,7 +141,7 @@
                     {% endif %}
                 </div>
                 <form method="POST" action="/delete/{{ e.id }}"
-                      onsubmit="return confirm('Delete?')">
+                      class="delete-form">
                     <input type="hidden" name="date" value="{{ selected_date }}">
                     <input type="hidden" name="redirect" value="/m">
                     <button class="delete-btn">✕</button>
@@ -154,6 +154,13 @@
     </div>
 
     <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            document.querySelectorAll('.delete-form').forEach(function(form) {
+                form.addEventListener('submit', function(e) {
+                    if (!confirm('Delete?')) e.preventDefault();
+                });
+            });
+        });
     </script>
 </body>
 </html>
