@@ -1,0 +1,105 @@
+/* Shared styles — used by both index.html and stats.html */
+
+/* === Base === */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+       background: #1a1a2e; color: #e0e0e0; padding: 20px; }
+a { color: #00d4ff; text-decoration: none; }
+a:hover { text-decoration: underline; }
+h1 { color: #00d4ff; margin-bottom: 0.5rem; }
+.header-links a { margin-left: 1rem; font-size: 0.9rem; }
+
+/* === Dashboard / Cards === */
+.dashboard { max-width: 1400px; margin: 0 auto; }
+.card { background: #16213e; border-radius: 12px; padding: 1.5rem;
+        margin-bottom: 1.5rem; }
+
+/* === Category badges & colors === */
+.cat-badge { display: inline-block; padding: 2px 8px; border-radius: 4px;
+             font-weight: 600; }
+.cat-strength { background: #e74c3c33; color: #e74c3c; }
+.cat-isometric { background: #f39c1233; color: #f39c12; }
+.cat-skill { background: #9b59b633; color: #9b59b6; }
+.cat-fitness { background: #2ecc7133; color: #2ecc71; }
+.cat-physio { background: #1abc9c33; color: #1abc9c; }
+.cat-flexibility { background: #3498db33; color: #3498db; }
+.cat-music { background: #e91e6333; color: #e91e63; }
+
+/* === Heatmap === */
+.heatmap-container { overflow-x: auto; }
+.heatmap { display: flex; gap: 2px; }
+.heatmap-week { display: flex; flex-direction: column; gap: 2px; }
+.heatmap-day { width: 14px; height: 14px; border-radius: 2px; }
+.heatmap-labels { display: flex; flex-direction: column; gap: 2px; margin-right: 6px;
+                  justify-content: flex-start; }
+.heatmap-label { height: 14px; font-size: 10px; color: #888; line-height: 14px; }
+.heatmap-months { display: flex; gap: 2px; margin-left: 26px; margin-bottom: 4px; }
+.heatmap-month { font-size: 10px; color: #888; }
+.heatmap-legend { display: flex; align-items: center; gap: 4px; margin-top: 8px;
+                  font-size: 11px; color: #888; }
+.heatmap-legend-box { width: 12px; height: 12px; border-radius: 2px; }
+
+/* === Timeline === */
+.timeline-container { overflow-x: auto; max-height: 600px; overflow-y: auto; }
+.timeline-row { display: flex; align-items: center; margin-bottom: 2px; }
+.timeline-label { width: 140px; min-width: 140px; font-size: 0.8rem; padding-right: 8px;
+                  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+                  position: sticky; left: 0; background: #0a0a23; z-index: 2; }
+.timeline-dots { display: flex; gap: 1px; flex: 1; }
+.timeline-dot { width: 2px; height: 14px; border-radius: 1px; }
+.timeline-dot.quarter-line { border-left: 1px solid #555; margin-left: 2px; padding-left: 2px; }
+.timeline-category-header { font-size: 0.75rem; font-weight: 700; padding: 6px 0 2px;
+                             text-transform: uppercase; letter-spacing: 1px; }
+
+/* === Progress charts === */
+.progress-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+                 gap: 1rem; }
+.progress-card { background: #0f3460; border-radius: 8px; padding: 1rem; }
+.progress-card h3 { color: #00d4ff; font-size: 0.9rem; margin-bottom: 0.5rem; }
+.range-btn { background: #1a1a3e; border: 1px solid #444; color: #aaa; padding: 2px 10px;
+             border-radius: 4px; cursor: pointer; font-size: 0.8rem; }
+.range-btn.active { background: #0f3460; border-color: #00d4ff; color: #00d4ff; }
+
+/* === Personal bests === */
+.pb-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+           gap: 1rem; }
+.pb-card { background: #0f3460; border-radius: 8px; padding: 1rem; text-align: center; }
+.pb-card .pb-value { font-size: 1.8rem; font-weight: 700; color: #00d4ff; }
+.pb-card .pb-exercise { font-size: 0.85rem; color: #ccc; margin-top: 0.3rem; }
+.pb-card .pb-date { font-size: 0.75rem; color: #888; margin-top: 0.2rem; }
+
+/* === Consistency table === */
+.stats-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+.stats-table th { text-align: left; padding: 8px 10px; color: #888; font-size: 0.75rem;
+                  border-bottom: 1px solid #333; white-space: nowrap; }
+.stats-table td { padding: 8px 10px; border-bottom: 1px solid #222; }
+.stats-table tr:hover { background: #0f3460; }
+.neglect-bar { height: 6px; border-radius: 3px; background: #333; position: relative;
+               overflow: hidden; min-width: 60px; }
+.neglect-fill { height: 100%; border-radius: 3px; }
+.streak-badge { display: inline-block; padding: 2px 6px; border-radius: 4px;
+                font-size: 0.75rem; font-weight: 600; }
+
+/* === Chart layout === */
+.chart-row { display: grid; grid-template-columns: 2fr 1fr; gap: 1.5rem; }
+
+/* === Monthly stories === */
+.monthly-stories { display: flex; flex-direction: column; gap: 1rem; }
+.story-month { background: #0f3460; border-radius: 10px; padding: 1rem 1.2rem;
+               border-left: 4px solid #00d4ff; }
+.story-header { display: flex; justify-content: space-between; align-items: center;
+                margin-bottom: 0.5rem; }
+.story-month-label { font-weight: 700; font-size: 1.05rem; color: #00d4ff; }
+.story-stats { font-size: 0.8rem; color: #888; }
+.story-text { font-size: 0.9rem; line-height: 1.6; color: #ccc; }
+
+/* === Misc === */
+.scroll-hint { font-size: 0.75rem; color: #666; margin-bottom: 0.5rem; }
+
+/* === Responsive === */
+@media (max-width: 768px) {
+    .chart-row { grid-template-columns: 1fr; }
+    .progress-grid { grid-template-columns: 1fr; }
+    .pb-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+    .timeline-label { width: 100px; min-width: 100px; font-size: 0.7rem; }
+}
