@@ -129,6 +129,20 @@ def compute_stats_data():
 
     progress_data = {k: v for k, v in progress_data.items() if len(v["dates"]) >= 5}
 
+    # Weight progression data: exercises where weight was recorded
+    weight_progress = {}
+    for entry in all_entries:
+        code = entry["exercise_code"]
+        w = entry["weight"]
+        if w is None or float(w) == 0:
+            continue
+        d = entry["date"].isoformat()
+        if code not in weight_progress:
+            weight_progress[code] = {"dates": [], "weights": []}
+        weight_progress[code]["dates"].append(d)
+        weight_progress[code]["weights"].append(float(w))
+    weight_progress = {k: v for k, v in weight_progress.items() if len(v["dates"]) >= 2}
+
     today = date.today()
     exercise_stats = []
     for r in exercise_stats_raw:
@@ -283,6 +297,7 @@ def compute_stats_data():
         "daily_exercises_json": json.dumps(daily_exercises),
         "timeline_json": json.dumps(timeline_data),
         "progress_json": json.dumps(progress_data),
+        "weight_progress_json": json.dumps(weight_progress),
         "category_dist_json": json.dumps(category_dist),
         "weekly_volume_json": json.dumps(weekly_volume),
         "monthly_volume_json": json.dumps(monthly_volume),

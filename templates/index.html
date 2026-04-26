@@ -461,8 +461,23 @@
         <!-- 5. Progress Charts -->
         <div class="card">
             <h2>📈 Progress Charts</h2>
-            <p class="scroll-hint">Exercises with 5+ data points · showing total volume per session</p>
-            <div class="progress-grid" id="progressGrid"></div>
+            <div id="weightProgressSection" style="display:none;">
+                <h3 style="color:#f39c12;margin:0.5rem 0;">🏋️ Weight Progression</h3>
+                <p class="scroll-hint">Added weight over time</p>
+                <div class="progress-grid" id="weightProgressGrid"></div>
+            </div>
+            <div id="activeProgressSection" style="display:none;">
+                <h3 style="color:#00d4ff;margin:1rem 0 0.5rem;">📊 Volume (Active)</h3>
+                <p class="scroll-hint">Total volume per session · exercises with 5+ data points</p>
+                <div class="progress-grid" id="activeProgressGrid"></div>
+            </div>
+            <div id="dormantProgressSection" style="display:none;">
+                <details style="margin-top:1rem;">
+                    <summary style="color:#888;cursor:pointer;font-size:0.9rem;">📦 Dormant exercises (35+ days inactive)</summary>
+                    <div class="progress-grid" id="dormantProgressGrid" style="margin-top:0.5rem;"></div>
+                </details>
+            </div>
+            <p id="noChartNote" style="color:#666;font-size:0.85rem;margin-top:0.75rem;display:none;"></p>
         </div>
 
         <!-- 6. Personal Bests -->
@@ -529,6 +544,7 @@
         const dailyExercises = {{ daily_exercises_json|safe }};
         const timelineData = {{ timeline_json|safe }};
         const progressData = {{ progress_json|safe }};
+        const weightProgress = {{ weight_progress_json|safe }};
         const categoryDist = {{ category_dist_json|safe }};
         const weeklyVolume = {{ weekly_volume_json|safe }};
         const monthlyVolume = {{ monthly_volume_json|safe }};
@@ -1019,25 +1035,31 @@
 
         // ===== 6. PROGRESS CHARTS =====
         (function() {
-            const grid = document.getElementById('progressGrid');
+            const DORMANT_DAYS = 35;
             const exMap = {};
             exercises.forEach(ex => exMap[ex.code] = ex);
 
-            Object.keys(progressData).sort().forEach(code => {
-                const data = progressData[code];
+            // Compute days since last entry for each exercise
+            const today = new Date();
+            today.setHours(0,0,0,0);
+            function daysSince(code) {
+                const dates = timelineData[code];
+                if (!dates || dates.length === 0) return 9999;
+                const last = new Date(dates[dates.length - 1]);
+                return Math.floor((today - last) / 86400000);
+            }
+
+            // Helper to render a volume chart into a grid
+            function renderVolumeChart(code, data, grid) {
                 const ex = exMap[code];
                 if (!ex) return;
-
                 const card = document.createElement('div');
                 card.className = 'progress-card';
-
                 const unitLabel = data.input_type === 'distance' ? 'km' :
                                   data.input_type === 'reps_sets' ? 'total reps' : 'total seconds';
-
                 card.innerHTML = `<h3>${ex.code} — ${ex.name} <span style="color:#888;font-weight:400;font-size:0.75rem;">(${unitLabel})</span></h3>
                                   <canvas id="prog-${code}" height="160"></canvas>`;
                 grid.appendChild(card);
-
                 const values = data.values;
                 const windowSize = Math.max(3, Math.floor(values.length / 5));
                 const trend = values.map((v, i) => {
@@ -1045,49 +1067,106 @@
                     const slice = values.slice(start, i + 1);
                     return slice.reduce((a, b) => a + b, 0) / slice.length;
                 });
-
                 new Chart(document.getElementById(`prog-${code}`), {
                     type: 'line',
                     data: {
                         labels: data.dates,
                         datasets: [
-                            {
-                                label: unitLabel,
-                                data: values,
-                                borderColor: catColors[ex.category],
-                                backgroundColor: catColorsBg[ex.category],
-                                fill: true,
-                                tension: 0.3,
-                                pointRadius: 2,
-                                pointHoverRadius: 5,
-                                borderWidth: 2,
-                            },
-                            {
-                                label: 'Trend',
-                                data: trend,
-                                borderColor: '#00d4ff',
-                                borderDash: [5, 3],
-                                pointRadius: 0,
-                                borderWidth: 1.5,
-                                fill: false,
-                            }
+                            { label: unitLabel, data: values, borderColor: catColors[ex.category],
+                              backgroundColor: catColorsBg[ex.category], fill: true, tension: 0.3,
+                              pointRadius: 2, pointHoverRadius: 5, borderWidth: 2 },
+                            { label: 'Trend', data: trend, borderColor: '#00d4ff',
+                              borderDash: [5, 3], pointRadius: 0, borderWidth: 1.5, fill: false }
                         ]
                     },
-                    options: {
-                        responsive: true,
-                        scales: {
-                            x: { display: false },
-                            y: { grid: { color: '#222' }, beginAtZero: false }
-                        },
-                        plugins: {
-                            legend: { display: false }
-                        }
+                    options: { responsive: true,
+                        scales: { x: { display: false }, y: { grid: { color: '#222' }, beginAtZero: false } },
+                        plugins: { legend: { display: false } }
+                    }
+                });
+            }
+
+            // --- Weight Progression Charts ---
+            const weightGrid = document.getElementById('weightProgressGrid');
+            const weightCodes = Object.keys(weightProgress).sort((a, b) => daysSince(a) - daysSince(b));
+            weightCodes.forEach(code => {
+                const wp = weightProgress[code];
+                const ex = exMap[code];
+                if (!ex) return;
+                const card = document.createElement('div');
+                card.className = 'progress-card';
+                card.innerHTML = `<h3>${ex.code} — ${ex.name} <span style="color:#888;font-weight:400;font-size:0.75rem;">(kg)</span></h3>
+                                  <canvas id="wprog-${code}" height="160"></canvas>`;
+                weightGrid.appendChild(card);
+                const values = wp.weights;
+                const windowSize = Math.max(2, Math.floor(values.length / 4));
+                const trend = values.map((v, i) => {
+                    const start = Math.max(0, i - windowSize + 1);
+                    const slice = values.slice(start, i + 1);
+                    return slice.reduce((a, b) => a + b, 0) / slice.length;
+                });
+                new Chart(document.getElementById(`wprog-${code}`), {
+                    type: 'line',
+                    data: {
+                        labels: wp.dates,
+                        datasets: [
+                            { label: 'Weight (kg)', data: values, borderColor: '#f39c12',
+                              backgroundColor: 'rgba(243,156,18,0.15)', fill: true, tension: 0.3,
+                              pointRadius: 3, pointHoverRadius: 6, borderWidth: 2 },
+                            { label: 'Trend', data: trend, borderColor: '#00d4ff',
+                              borderDash: [5, 3], pointRadius: 0, borderWidth: 1.5, fill: false }
+                        ]
+                    },
+                    options: { responsive: true,
+                        scales: { x: { display: false }, y: { grid: { color: '#222' }, beginAtZero: false } },
+                        plugins: { legend: { display: false } }
                     }
                 });
             });
+            if (weightCodes.length > 0) {
+                document.getElementById('weightProgressSection').style.display = '';
+            }
 
-            if (Object.keys(progressData).length === 0) {
-                grid.innerHTML = '<p style="color:#666;">No exercises with enough data points yet.</p>';
+            // --- Active & Dormant Volume Charts ---
+            const activeGrid = document.getElementById('activeProgressGrid');
+            const dormantGrid = document.getElementById('dormantProgressGrid');
+            const allCodes = Object.keys(progressData);
+
+            // Exercises with input_type 'none' or not in progressData → no chart
+            const codesWithChart = new Set([...allCodes, ...weightCodes]);
+            const noneInputCodes = exercises
+                .filter(ex => ex.input_type === 'none')
+                .map(ex => ex.code);
+            // Also include exercises with entries but no progress data and no weight data
+            const codesWithEntries = new Set(Object.keys(timelineData));
+            const noChartCodes = [];
+            exercises.forEach(ex => {
+                if (codesWithEntries.has(ex.code) && !codesWithChart.has(ex.code)) {
+                    noChartCodes.push(ex.code);
+                }
+            });
+
+            // Sort active by least recently done first
+            const activeCodes = allCodes.filter(c => daysSince(c) < DORMANT_DAYS)
+                .sort((a, b) => daysSince(b) - daysSince(a));
+            const dormantCodes = allCodes.filter(c => daysSince(c) >= DORMANT_DAYS)
+                .sort((a, b) => daysSince(b) - daysSince(a));
+
+            activeCodes.forEach(code => renderVolumeChart(code, progressData[code], activeGrid));
+            dormantCodes.forEach(code => renderVolumeChart(code, progressData[code], dormantGrid));
+
+            if (activeCodes.length > 0) {
+                document.getElementById('activeProgressSection').style.display = '';
+            }
+            if (dormantCodes.length > 0) {
+                document.getElementById('dormantProgressSection').style.display = '';
+            }
+
+            // Note for exercises without charts
+            if (noChartCodes.length > 0) {
+                const note = document.getElementById('noChartNote');
+                note.textContent = 'No progress chart for: ' + noChartCodes.join(', ');
+                note.style.display = '';
             }
         })();
 
