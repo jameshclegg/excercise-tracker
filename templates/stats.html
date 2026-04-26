@@ -832,7 +832,7 @@
                 });
 
                 const weightGrid = document.getElementById('weightProgressGrid');
-                const weightCodes = Object.keys(weightProgress).sort((a, b) => daysSince(a) - daysSince(b));
+                const weightCodes = Object.keys(weightProgress).filter(c => daysSince(c) < DORMANT_DAYS).sort((a, b) => daysSince(a) - daysSince(b));
                 weightCodes.forEach(code => {
                     const wp = weightProgress[code];
                     const ex = exMap[code];
