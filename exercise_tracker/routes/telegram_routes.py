@@ -101,7 +101,7 @@ def telegram_webhook():
             else:
                 lines = ["📋 *To-Do*\n"]
                 for item in plan["todo_items"]:
-                    lines.append(f"  `{item['last_entry']}` — {item['name']} ({item['days_ago']}d ago)")
+                    lines.append(f"  `{item['last_entry']}` — {item['name']} ({item['days_ago']}d ago, {item['freq_label']})")
                 telegram_reply(chat_id, "\n".join(lines))
             return jsonify({"ok": True})
 
@@ -112,7 +112,7 @@ def telegram_webhook():
             else:
                 lines = ["⚠️ *Slipping*\n"]
                 for item in plan["slipping_items"]:
-                    lines.append(f"  `{item['code']}` — {item['name']}")
+                    lines.append(f"  `{item['code']}` — {item['name']} ({item['days_ago']}d, {item['freq_label']})")
                 telegram_reply(chat_id, "\n".join(lines))
             return jsonify({"ok": True})
 
@@ -122,14 +122,14 @@ def telegram_webhook():
             if plan["todo_items"]:
                 lines.append("📋 *To-Do*\n")
                 for item in plan["todo_items"]:
-                    lines.append(f"  `{item['last_entry']}` — {item['name']} ({item['days_ago']}d ago)")
+                    lines.append(f"  `{item['last_entry']}` — {item['name']} ({item['days_ago']}d ago, {item['freq_label']})")
             else:
                 lines.append("✅ All caught up!\n")
             lines.append("")
             if plan["slipping_items"]:
                 lines.append("⚠️ *Slipping*\n")
                 for item in plan["slipping_items"]:
-                    lines.append(f"  `{item['code']}` — {item['name']}")
+                    lines.append(f"  `{item['code']}` — {item['name']} ({item['days_ago']}d, {item['freq_label']})")
             else:
                 lines.append("👍 Nothing slipping!")
             telegram_reply(chat_id, "\n".join(lines))
@@ -178,7 +178,7 @@ def telegram_webhook():
             cur = conn.cursor(cursor_factory=RealDictCursor)
             cur.execute(
                 """
-                SELECT e.date, e.exercise_code, e.sets, e.weight, ex.name
+                SELECT e.date, e.exercise_code, e.sets, e.weight, ex.name, ex.target_freq
                 FROM entries e
                 JOIN exercises ex ON e.exercise_code = ex.code
                 WHERE e.date >= %s
@@ -218,6 +218,8 @@ def telegram_webhook():
             lines.append("\n📋 By exercise:\n")
             for code in sorted(by_exercise.keys()):
                 entries = by_exercise[code]
+                freq = entries[0]["target_freq"] or 1
+                freq_label = f"{freq:g}x/wk"
                 details = []
                 for e in entries:
                     days_ago = (today - e["date"]).days
@@ -229,7 +231,7 @@ def telegram_webhook():
                         parts.append(f"@{e['weight']}kg")
                     detail = " ".join(parts) if parts else "✓"
                     details.append(f"{detail} ({day_label})")
-                lines.append(f"  {code}: {', '.join(details)}")
+                lines.append(f"  {code} [{freq_label}]: {', '.join(details)}")
 
             telegram_reply(chat_id, "\n".join(lines))
             return jsonify({"ok": True})
@@ -278,22 +280,24 @@ def telegram_webhook():
             cur = conn.cursor(cursor_factory=RealDictCursor)
             cur.execute(
                 """
-                SELECT ex.code, ex.name,
+                SELECT ex.code, ex.name, ex.target_freq,
                        MAX(e.date) as last_done
                 FROM exercises ex
                 LEFT JOIN entries e ON ex.code = e.exercise_code
-                GROUP BY ex.code, ex.name
+                GROUP BY ex.code, ex.name, ex.target_freq
                 ORDER BY MAX(e.date) DESC NULLS LAST, ex.code
                 """,
             )
             rows = cur.fetchall()
             lines = ["📖 Exercise codes:\n"]
             for r in rows:
+                freq = r["target_freq"] or 1
+                freq_label = f"{freq:g}x/wk" if freq != 1 else "1x/wk"
                 if r["last_done"]:
                     days_ago = (today - r["last_done"]).days
-                    lines.append(f"  {r['code']} — {r['name']} ({days_ago}d ago)")
+                    lines.append(f"  {r['code']} — {r['name']} ({days_ago}d ago, {freq_label})")
                 else:
-                    lines.append(f"  {r['code']} — {r['name']} (never)")
+                    lines.append(f"  {r['code']} — {r['name']} (never, {freq_label})")
             telegram_reply(chat_id, "\n".join(lines))
             return jsonify({"ok": True})
 

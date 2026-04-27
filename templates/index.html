@@ -192,7 +192,7 @@
         {% for item in todo_items %}
         <div class="plan-item">
             <code>{{ item.last_entry }}</code>
-            <span class="plan-name">{{ item.name }} ({{ item.days_ago }}d ago)</span>
+            <span class="plan-name">{{ item.name }} <span style="color:#888; font-size:0.75rem;">({{ item.days_ago }}d ago, {{ item.freq_label }})</span></span>
         </div>
         {% endfor %}
         {% else %}
@@ -204,7 +204,7 @@
         {% for item in slipping_items %}
         <div class="plan-item">
             <code>{{ item.code }}</code>
-            <span class="plan-name">{{ item.name }}</span>
+            <span class="plan-name">{{ item.name }} <span style="color:#888; font-size:0.75rem;">({{ item.days_ago }}d, {{ item.freq_label }})</span></span>
         </div>
         {% endfor %}
         {% else %}
@@ -243,7 +243,7 @@
                     container.innerHTML = '<p style="color:#888;">No entries found for ' + code + '</p>';
                     return;
                 }
-                let html = '<p style="color:#00d4ff; font-weight:600; margin-bottom:8px;">' + escapeHtml(code) + ' — ' + escapeHtml(data.name) + '</p>';
+                let html = '<p style="color:#00d4ff; font-weight:600; margin-bottom:8px;">' + escapeHtml(code) + ' — ' + escapeHtml(data.name) + ' <span style="color:#888; font-weight:400; font-size:0.8rem;">(' + escapeHtml(data.freq_label) + ')</span></p>';
                 dates.forEach(d => {
                     html += '<div style="background:#1a1a2e; border-radius:6px; padding:8px 12px; margin-bottom:6px;">';
                     html += '<strong style="color:#ccc;">' + escapeHtml(d) + '</strong>';

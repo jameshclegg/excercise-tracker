@@ -53,6 +53,7 @@ def compute_plan_data():
         # Derive the expected interval from target frequency:
         # e.g. freq=2 means twice/week → interval=3.5 days
         interval = 7.0 / float(freq)
+        freq_label = f"{float(freq):g}x/wk"
 
         if days_since >= 14:
             # Slipping
@@ -60,6 +61,7 @@ def compute_plan_data():
                 "code": ex["code"],
                 "name": ex["name"],
                 "days_ago": days_since,
+                "freq_label": freq_label,
             })
         elif days_since >= interval:
             # To-do: get last entry details
@@ -84,6 +86,7 @@ def compute_plan_data():
                 "name": ex["name"],
                 "last_entry": " ".join(parts),
                 "days_ago": days_since,
+                "freq_label": freq_label,
             })
 
     # Sort by most neglected first

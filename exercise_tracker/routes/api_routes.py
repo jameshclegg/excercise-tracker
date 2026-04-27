@@ -111,7 +111,7 @@ def recent(code):
     conn = get_db()
     cur = conn.cursor(cursor_factory=RealDictCursor)
     cur.execute("""
-        SELECT e.date, e.sets, e.weight, e.notes, ex.name, ex.input_type
+        SELECT e.date, e.sets, e.weight, e.notes, ex.name, ex.input_type, ex.target_freq
         FROM entries e
         JOIN exercises ex ON e.exercise_code = ex.code
         WHERE e.exercise_code = %s
@@ -134,8 +134,11 @@ def recent(code):
             "sets": r["sets"], "weight": float(r["weight"]) if r["weight"] else None,
             "notes": r["notes"], "input_type": r["input_type"]
         })
+    freq = float(rows[0]["target_freq"]) if rows and rows[0]["target_freq"] else 1
+    freq_label = f"{freq:g}x/wk"
     return jsonify({
         "name": rows[0]["name"] if rows else code,
         "dates": by_date,
-        "exercise_notes": notes_row["notes"] if notes_row else None
+        "exercise_notes": notes_row["notes"] if notes_row else None,
+        "freq_label": freq_label
     })
