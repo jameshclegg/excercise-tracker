@@ -162,8 +162,11 @@ def compute_stats_data():
         code = entry["exercise_code"]
         if code not in weight_ever:
             continue
+        # Skip entries with no weight — only plot actual weight data points
+        if entry["weight"] is None:
+            continue
         d = entry["date"].isoformat()
-        w = float(entry["weight"]) if entry["weight"] is not None else 0.0
+        w = float(entry["weight"])
         if code not in weight_progress:
             weight_progress[code] = {"dates": [], "weights": []}
         weight_progress[code]["dates"].append(d)

@@ -303,6 +303,7 @@ function initProgressCharts(opts) {
             weightGrid.appendChild(card);
             // Weight chart: filled area + dashed trend overlay.
             // tension: 0.3 gives a gentle curve; divisor 4 = ~25% window for smoother weight trend.
+            // grace: '10%' adds padding so data points near min/max aren't clipped.
             chartInstances.push(new Chart(document.getElementById(cid), {
                 type: 'line',
                 data: { datasets: [
@@ -313,7 +314,8 @@ function initProgressCharts(opts) {
                       borderDash: [5, 3], pointRadius: 0, borderWidth: 1.5, fill: false }
                 ]},
                 options: { responsive: true,
-                    scales: { x: xScaleOpts, y: { grid: { color: '#222' }, beginAtZero: false } },
+                    scales: { x: xScaleOpts, y: { grid: { color: '#222' }, beginAtZero: false,
+                        grace: '10%' } },
                     plugins: { legend: { display: false } } }
             }));
         });
