@@ -285,10 +285,10 @@ function initProgressCharts(opts) {
         });
 
         // --- Weight Progression ---
-        // Show weight charts for all exercises that have weight data, sorted by recency.
+        // Only show weight charts for non-dormant exercises, sorted by recency.
         // Skip exercises with fewer than 2 data points — can't draw a meaningful line.
         const weightGrid = document.getElementById('weightProgressGrid');
-        const weightCodes = Object.keys(weightProgress).sort((a, b) => _daysSince(a) - _daysSince(b));
+        const weightCodes = Object.keys(weightProgress).filter(c => _daysSince(c) < DORMANT_DAYS).sort((a, b) => _daysSince(a) - _daysSince(b));
         weightCodes.forEach(code => {
             const wp = weightProgress[code];
             const ex = exMap[code];
