@@ -285,10 +285,10 @@ function initProgressCharts(opts) {
         });
 
         // --- Weight Progression ---
-        // Only show weight charts for non-dormant exercises, sorted by recency.
+        // Show weight charts for all exercises that have weight data, sorted by recency.
         // Skip exercises with fewer than 2 data points — can't draw a meaningful line.
         const weightGrid = document.getElementById('weightProgressGrid');
-        const weightCodes = Object.keys(weightProgress).filter(c => _daysSince(c) < DORMANT_DAYS).sort((a, b) => _daysSince(a) - _daysSince(b));
+        const weightCodes = Object.keys(weightProgress).sort((a, b) => _daysSince(a) - _daysSince(b));
         weightCodes.forEach(code => {
             const wp = weightProgress[code];
             const ex = exMap[code];
@@ -298,7 +298,7 @@ function initProgressCharts(opts) {
             const card = document.createElement('div');
             card.className = 'progress-card';
             const cid = `wprog-${code}-${months}`;
-            card.innerHTML = `<h3>${escapeHtml(ex.code)} ΓÇö ${escapeHtml(ex.name)} <span style="color:#888;font-weight:400;font-size:0.75rem;">(kg)</span></h3>
+            card.innerHTML = `<h3>${escapeHtml(ex.code)} — ${escapeHtml(ex.name)} <span style="color:#888;font-weight:400;font-size:0.75rem;">(kg)</span></h3>
                               <canvas id="${cid}" height="160"></canvas>`;
             weightGrid.appendChild(card);
             // Weight chart: filled area + dashed trend overlay.
@@ -346,7 +346,7 @@ function initProgressCharts(opts) {
             const card = document.createElement('div');
             card.className = 'progress-card';
             const cid = `prog-${code}-${months}`;
-            card.innerHTML = `<h3>${escapeHtml(ex.code)} ΓÇö ${escapeHtml(ex.name)} <span style="color:#888;font-weight:400;font-size:0.75rem;">(${escapeHtml(unitLabel)})</span></h3>
+            card.innerHTML = `<h3>${escapeHtml(ex.code)} — ${escapeHtml(ex.name)} <span style="color:#888;font-weight:400;font-size:0.75rem;">(${escapeHtml(unitLabel)})</span></h3>
                               <canvas id="${cid}" height="160"></canvas>`;
             grid.appendChild(card);
             // Volume chart: colored by exercise category, with a 20%-window trend line.

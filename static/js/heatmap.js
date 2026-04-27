@@ -190,7 +190,7 @@ function renderTimeline(timelineData, exercises) {
         const label = document.createElement('div');
         label.className = 'timeline-label';
         if (dimmed) label.style.opacity = '0.5';
-        label.textContent = ex.code + ' ΓÇö ' + ex.name;
+        label.textContent = ex.code + ' — ' + ex.name;
         label.title = ex.name;
         row.appendChild(label);
         const dotsDiv = document.createElement('div');
@@ -359,7 +359,7 @@ function renderDensityTimeline(timelineData, exercises) {
 
         const label = document.createElement('div');
         label.className = 'timeline-label';
-        label.textContent = ex.code + ' ΓÇö ' + ex.name;
+        label.textContent = ex.code + ' — ' + ex.name;
         label.title = ex.name;
         row.appendChild(label);
 
