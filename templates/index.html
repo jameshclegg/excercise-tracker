@@ -214,18 +214,20 @@
 
     </div> <!-- end entries-plan-row -->
 
-    <!-- Recent History Lookup -->
+    <!-- History Lookup -->
     <div class="card" style="margin:1.5rem auto; max-width:900px; padding:1rem 1.5rem;">
-        <h2>🔍 Recent History</h2>
+        <h2>🔍 History</h2>
         <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
             <input type="text" id="recentSearch" list="exerciseList" placeholder="Type or select exercise…"
-                   aria-label="Search exercise for recent history"
+                   aria-label="Search exercise for history"
                    style="padding:8px; background:#1a1a2e; color:#eee; border:1px solid #333; border-radius:4px; min-width:250px;">
             <datalist id="exerciseList">
                 {% for ex in exercises %}
                 <option value="{{ ex.code }}">{{ ex.code }} — {{ ex.name }}</option>
                 {% endfor %}
             </datalist>
+            <!-- Toggle between recent (3 dates) and full (all) history -->
+            <button id="historyToggle" style="display:none; padding:6px 14px; background:#16213e; color:#00d4ff; border:1px solid #00d4ff; border-radius:4px; cursor:pointer; font-size:0.85rem;">Full</button>
         </div>
         <div id="recentResults" style="margin-top:10px;"></div>
     </div>
@@ -236,20 +238,36 @@
             if (new Set(parts).size === 1) return parts[0] + ' ' + parts.length;
             return s;
         }
-        async function lookupRecent(val) {
+
+        /* Track current history mode: false = recent (3 dates), true = full */
+        var historyFull = false;
+
+        async function lookupRecent(val, full) {
             const code = val.trim();
             const container = document.getElementById('recentResults');
-            if (!code) { container.innerHTML = ''; return; }
+            const toggleBtn = document.getElementById('historyToggle');
+            if (!code) { container.innerHTML = ''; toggleBtn.style.display = 'none'; return; }
+            if (full === undefined) full = historyFull;
             try {
-                const resp = await fetch('/api/recent/' + encodeURIComponent(code));
-                if (!resp.ok) { container.innerHTML = '<p style="color:#f44;">Exercise not found</p>'; return; }
+                let url = '/api/recent/' + encodeURIComponent(code);
+                if (full) url += '?full=1';
+                const resp = await fetch(url);
+                if (!resp.ok) { container.innerHTML = '<p style="color:#f44;">Exercise not found</p>'; toggleBtn.style.display = 'none'; return; }
                 const data = await resp.json();
                 const dates = Object.keys(data.dates);
                 if (dates.length === 0) {
                     container.innerHTML = '<p style="color:#888;">No entries found for ' + code + '</p>';
+                    toggleBtn.style.display = 'none';
                     return;
                 }
-                let html = '<p style="color:#00d4ff; font-weight:600; margin-bottom:8px;">' + escapeHtml(code) + ' — ' + escapeHtml(data.name) + ' <span style="color:#888; font-weight:400; font-size:0.8rem;">(' + escapeHtml(data.freq_label) + ')</span></p>';
+                /* Show toggle button and update its label */
+                toggleBtn.style.display = 'inline-block';
+                toggleBtn.textContent = full ? 'Recent' : 'Full';
+
+                let html = '<p style="color:#00d4ff; font-weight:600; margin-bottom:8px;">' + escapeHtml(code) + ' \u2014 ' + escapeHtml(data.name) + ' <span style="color:#888; font-weight:400; font-size:0.8rem;">(' + escapeHtml(data.freq_label) + ')</span></p>';
+
+                /* Wrap entries in a scrollable box when showing full history */
+                if (full) html += '<div style="max-height:400px; overflow-y:auto; padding-right:6px;">';
                 dates.forEach(d => {
                     html += '<div style="background:#1a1a2e; border-radius:6px; padding:8px 12px; margin-bottom:6px;">';
                     html += '<strong style="color:#ccc;">' + escapeHtml(d) + '</strong>';
@@ -262,15 +280,17 @@
                             else if (e.input_type === 'reps_sets') html += escapeHtml(cs) + ' reps' + (e.weight ? ' @ ' + escapeHtml(String(e.weight)) + 'kg' : '');
                             else if (e.input_type === 'time_sets') html += escapeHtml(cs) + 's' + (e.weight ? ' @ ' + escapeHtml(String(e.weight)) + 'kg' : '');
                             else html += escapeHtml(cs);
-                        } else { html += '✓ Done'; }
+                        } else { html += '\u2713 Done'; }
                         if (e.notes) html += ' <span style="color:#666;">(' + escapeHtml(e.notes) + ')</span>';
                         html += '</span>';
                     });
                     html += '</div>';
                 });
+                if (full) html += '</div>';
+
                 if (data.exercise_notes) {
                     html += '<div style="background:#0f3460; border-radius:6px; padding:8px 12px; margin-top:8px; border-left:3px solid #f39c12;">';
-                    html += '<span style="color:#f39c12; font-size:0.8rem;">📝 Notes:</span> ';
+                    html += '<span style="color:#f39c12; font-size:0.8rem;">\ud83d\udcdd Notes:</span> ';
                     html += '<span style="color:#ccc;">' + escapeHtml(data.exercise_notes).replace(/\n/g, '<br>') + '</span></div>';
                 }
                 container.innerHTML = html;
@@ -637,6 +657,15 @@
                 recentSearch.addEventListener('change', function() { lookupRecent(this.value); });
                 recentSearch.addEventListener('keydown', function(e) {
                     if (e.key === 'Enter') { lookupRecent(this.value); e.preventDefault(); }
+                });
+            }
+            /* Toggle between recent and full history views */
+            var historyToggleBtn = document.getElementById('historyToggle');
+            if (historyToggleBtn) {
+                historyToggleBtn.addEventListener('click', function() {
+                    historyFull = !historyFull;
+                    var code = document.getElementById('recentSearch').value;
+                    if (code) lookupRecent(code, historyFull);
                 });
             }
             var noteSaveBtn = document.getElementById('noteSaveBtn');

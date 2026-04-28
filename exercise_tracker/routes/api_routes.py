@@ -99,35 +99,40 @@ def save_injury_notes():
 @bp.route("/recent/<code>")
 @require_login
 def recent(code):
-    """Return recent history for a single exercise, grouped by date.
+    """Return history for a single exercise, grouped by date.
 
-    Fetches the last 10 entries and groups them into the 3 most recent
-    dates. Response includes exercise name, per-date entry details,
-    and any saved exercise notes.
+    By default, fetches the last 10 entries and groups them into the
+    3 most recent dates. If ?full=1 is passed, fetches ALL entries
+    with no date limit. Response includes exercise name, per-date
+    entry details, and any saved exercise notes.
     """
     valid_codes = get_valid_codes()
     if code not in valid_codes:
         return jsonify({"error": "unknown exercise code"}), 404
+    full = request.args.get("full") == "1"
     conn = get_db()
     cur = conn.cursor(cursor_factory=RealDictCursor)
-    cur.execute("""
+    # In full mode, fetch all entries; otherwise limit to 10
+    query = """
         SELECT e.date, e.sets, e.weight, e.notes, ex.name, ex.input_type, ex.target_freq
         FROM entries e
         JOIN exercises ex ON e.exercise_code = ex.code
         WHERE e.exercise_code = %s
         ORDER BY e.date DESC, e.id DESC
-        LIMIT 10
-    """, (code,))
+    """
+    if not full:
+        query += " LIMIT 10"
+    cur.execute(query, (code,))
     rows = cur.fetchall()
     cur.execute("SELECT notes FROM exercise_notes WHERE exercise_code = %s", (code,))
     notes_row = cur.fetchone()
-    # Group by date, keeping only the 3 most recent dates to avoid
-    # overwhelming the popup with old data
+    # Group by date — in default mode, keep only the 3 most recent
+    # dates to avoid overwhelming the popup with old data
     by_date = OrderedDict()
     for r in rows:
         d = r["date"].isoformat()
         if d not in by_date:
-            if len(by_date) >= 3:
+            if not full and len(by_date) >= 3:
                 break
             by_date[d] = []
         by_date[d].append({
