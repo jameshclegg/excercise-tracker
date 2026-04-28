@@ -51,8 +51,10 @@ def compute_plan_data():
             continue  # dormant
 
         # Derive the expected interval from target frequency:
-        # e.g. freq=2 means twice/week → interval=3.5 days
-        interval = 7.0 / float(freq)
+        # e.g. freq=2 means twice/week → 7/2=3.5 → floor to 3 days
+        # Floor ensures exercises appear in todo promptly rather than waiting
+        # an extra day when the interval isn't a whole number.
+        interval = int(7.0 / float(freq))
         freq_label = f"{float(freq):g}x/wk"
 
         if days_since >= 14:
