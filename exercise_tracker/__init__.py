@@ -22,6 +22,16 @@ def create_app():
     )
     app.secret_key = SECRET_KEY
 
+    @app.template_filter("collapse_sets")
+    def collapse_sets_filter(sets_str):
+        """Collapse repeated equal sets for display: '9+9+9' → '9 3'."""
+        if not sets_str or "+" not in sets_str:
+            return sets_str
+        parts = sets_str.split("+")
+        if len(set(parts)) == 1:
+            return f"{parts[0]} {len(parts)}"
+        return sets_str
+
     # Create tables and run migrations on startup
     init_db()
 

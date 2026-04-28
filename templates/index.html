@@ -155,13 +155,13 @@
                 <td>
                     {% if e.sets %}
                         {% if e.input_type == 'distance' %}
-                            {{ e.sets }} km
+                            {{ e.sets|collapse_sets }} km
                         {% elif e.input_type == 'reps_sets' %}
-                            {{ e.sets }} reps{% if e.weight %} @ {{ e.weight }}kg{% endif %}
+                            {{ e.sets|collapse_sets }} reps{% if e.weight %} @ {{ e.weight }}kg{% endif %}
                         {% elif e.input_type == 'time_sets' %}
-                            {{ e.sets }}s{% if e.weight %} @ {{ e.weight }}kg{% endif %}
+                            {{ e.sets|collapse_sets }}s{% if e.weight %} @ {{ e.weight }}kg{% endif %}
                         {% else %}
-                            {{ e.sets }}
+                            {{ e.sets|collapse_sets }}
                         {% endif %}
                     {% else %}
                         ✓ Done
@@ -230,6 +230,12 @@
         <div id="recentResults" style="margin-top:10px;"></div>
     </div>
     <script>
+        function collapseSets(s) {
+            if (!s || !s.includes('+')) return s;
+            const parts = s.split('+');
+            if (new Set(parts).size === 1) return parts[0] + ' ' + parts.length;
+            return s;
+        }
         async function lookupRecent(val) {
             const code = val.trim();
             const container = document.getElementById('recentResults');
@@ -250,11 +256,12 @@
                     data.dates[d].forEach(e => {
                         html += '<span style="margin-left:12px; color:#aaa;">';
                         if (e.sets) {
-                            if (e.input_type === 'distance') html += escapeHtml(e.sets) + ' km';
-                            else if (e.input_type === 'minutes') html += escapeHtml(e.sets) + ' min';
-                            else if (e.input_type === 'reps_sets') html += escapeHtml(e.sets) + ' reps' + (e.weight ? ' @ ' + escapeHtml(String(e.weight)) + 'kg' : '');
-                            else if (e.input_type === 'time_sets') html += escapeHtml(e.sets) + 's' + (e.weight ? ' @ ' + escapeHtml(String(e.weight)) + 'kg' : '');
-                            else html += escapeHtml(e.sets);
+                            const cs = collapseSets(e.sets);
+                            if (e.input_type === 'distance') html += escapeHtml(cs) + ' km';
+                            else if (e.input_type === 'minutes') html += escapeHtml(cs) + ' min';
+                            else if (e.input_type === 'reps_sets') html += escapeHtml(cs) + ' reps' + (e.weight ? ' @ ' + escapeHtml(String(e.weight)) + 'kg' : '');
+                            else if (e.input_type === 'time_sets') html += escapeHtml(cs) + 's' + (e.weight ? ' @ ' + escapeHtml(String(e.weight)) + 'kg' : '');
+                            else html += escapeHtml(cs);
                         } else { html += '✓ Done'; }
                         if (e.notes) html += ' <span style="color:#666;">(' + escapeHtml(e.notes) + ')</span>';
                         html += '</span>';

@@ -124,13 +124,13 @@
                     <div class="entry-values">
                         {% if e.sets %}
                             {% if e.input_type == 'distance' %}
-                                {{ e.sets }} km
+                                {{ e.sets|collapse_sets }} km
                             {% elif e.input_type == 'reps_sets' %}
-                                {{ e.sets }} reps{% if e.weight %} @ {{ e.weight }}kg{% endif %}
+                                {{ e.sets|collapse_sets }} reps{% if e.weight %} @ {{ e.weight }}kg{% endif %}
                             {% elif e.input_type == 'time_sets' %}
-                                {{ e.sets }}s{% if e.weight %} @ {{ e.weight }}kg{% endif %}
+                                {{ e.sets|collapse_sets }}s{% if e.weight %} @ {{ e.weight }}kg{% endif %}
                             {% else %}
-                                {{ e.sets }}
+                                {{ e.sets|collapse_sets }}
                             {% endif %}
                         {% else %}
                             ✓ Done
