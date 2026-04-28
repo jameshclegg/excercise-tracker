@@ -41,6 +41,7 @@ CATEGORY_DEFAULT_INPUT = {
 CODE_INPUT_OVERRIDES = {
     "J": "distance",
     "E": "time_sets",
+    "TI": "time_sets",
 }
 
 # Code aliases: common misspellings and shorthand names → canonical codes

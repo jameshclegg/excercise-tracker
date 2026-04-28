@@ -40,6 +40,7 @@ SP = pistol squat [strength] {legs} <1>
 SQ = overhead tricep curls [physio] {arms} <7>
 T = kitchen tricep dips [strength] {arms} <1>
 T3 = dips on P3/TRX [strength] {arms} <2>
+TI = tricep isometric [physio] {arms}
 TN = tricep dip negative [physio] {arms} <4>
 TT = triangle push up [strength] {chest} <1>
 U = sit ups [strength] {core} <1>
