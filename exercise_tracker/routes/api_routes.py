@@ -2,7 +2,8 @@
 
 from collections import OrderedDict
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request, Response
+import json
 from psycopg2.extras import RealDictCursor
 
 from ..auth import require_login
@@ -141,9 +142,14 @@ def recent(code):
         })
     freq = float(rows[0]["target_freq"]) if rows and rows[0]["target_freq"] else 1
     freq_label = f"{freq:g}x/wk"
-    return jsonify({
-        "name": rows[0]["name"] if rows else code,
-        "dates": by_date,
-        "exercise_notes": notes_row["notes"] if notes_row else None,
-        "freq_label": freq_label
-    })
+    # Use json.dumps with sort_keys=False to preserve date ordering
+    # (Flask's jsonify sorts keys alphabetically, reversing our DESC order)
+    return Response(
+        json.dumps({
+            "name": rows[0]["name"] if rows else code,
+            "dates": by_date,
+            "exercise_notes": notes_row["notes"] if notes_row else None,
+            "freq_label": freq_label
+        }, sort_keys=False),
+        mimetype="application/json"
+    )
