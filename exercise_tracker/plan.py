@@ -95,4 +95,20 @@ def compute_plan_data():
     todo_items.sort(key=lambda x: x["days_ago"], reverse=True)
     slipping_items.sort(key=lambda x: x["days_ago"], reverse=True)
 
-    return {"todo_items": todo_items, "slipping_items": slipping_items}
+    # Fetch due reminders (reminder_date <= today, not dismissed)
+    cur.execute("""
+        SELECT id, reminder_date, text
+        FROM reminders
+        WHERE dismissed = FALSE AND reminder_date <= %s
+        ORDER BY reminder_date, id
+    """, (today.isoformat(),))
+    due_reminders = [
+        {"id": r["id"], "date": r["reminder_date"].isoformat(), "text": r["text"]}
+        for r in cur.fetchall()
+    ]
+
+    return {
+        "todo_items": todo_items,
+        "slipping_items": slipping_items,
+        "due_reminders": due_reminders,
+    }

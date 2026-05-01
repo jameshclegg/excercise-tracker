@@ -1,13 +1,14 @@
-"""API routes — exercises, notes, injury notes, recent history."""
+"""API routes — exercises, notes, injury notes, history, reminders, frequency."""
 
 from collections import OrderedDict
+from datetime import date
 
 from flask import Blueprint, jsonify, request, Response
 import json
 from psycopg2.extras import RealDictCursor
 
 from ..auth import require_login
-from ..db import get_db
+from ..db import get_db, update_exercise_freq
 from ..parsing import get_valid_codes
 
 bp = Blueprint("api", __name__, url_prefix="/api")
@@ -153,3 +154,84 @@ def recent(code):
         }, sort_keys=False),
         mimetype="application/json"
     )
+
+
+# --- Reminders ---
+
+@bp.route("/reminders")
+@require_login
+def list_reminders():
+    """Return all undismissed reminders, with is_due flag."""
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    today = date.today()
+    cur.execute("""
+        SELECT id, reminder_date, text, created_at
+        FROM reminders
+        WHERE dismissed = FALSE
+        ORDER BY reminder_date, id
+    """)
+    rows = cur.fetchall()
+    result = []
+    for r in rows:
+        result.append({
+            "id": r["id"],
+            "date": r["reminder_date"].isoformat(),
+            "text": r["text"],
+            "is_due": r["reminder_date"] <= today,
+        })
+    return jsonify(result)
+
+
+@bp.route("/reminder", methods=["POST"])
+@require_login
+def add_reminder():
+    """Add a new reminder. Expects JSON: {date: 'YYYY-MM-DD', text: '...'}."""
+    data = request.get_json(silent=True)
+    if not data or not data.get("date") or not data.get("text", "").strip():
+        return jsonify({"error": "date and text required"}), 400
+    try:
+        reminder_date = date.fromisoformat(data["date"])
+    except ValueError:
+        return jsonify({"error": "invalid date format"}), 400
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute(
+        "INSERT INTO reminders (reminder_date, text) VALUES (%s, %s) RETURNING id",
+        (reminder_date.isoformat(), data["text"].strip()),
+    )
+    new_id = cur.fetchone()[0]
+    return jsonify({"ok": True, "id": new_id})
+
+
+@bp.route("/reminder/<int:reminder_id>/dismiss", methods=["POST"])
+@require_login
+def dismiss_reminder(reminder_id):
+    """Dismiss a reminder by ID."""
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("UPDATE reminders SET dismissed = TRUE WHERE id = %s", (reminder_id,))
+    return jsonify({"ok": True})
+
+
+# --- Frequency change ---
+
+@bp.route("/freq", methods=["POST"])
+@require_login
+def change_freq():
+    """Change an exercise's target frequency. Expects JSON: {code, freq}."""
+    data = request.get_json(silent=True)
+    if not data or not data.get("code") or data.get("freq") is None:
+        return jsonify({"error": "code and freq required"}), 400
+    code = data["code"].strip().upper()
+    valid_codes = get_valid_codes()
+    if code not in valid_codes:
+        return jsonify({"error": f"unknown exercise code: {code}"}), 404
+    try:
+        freq = float(data["freq"])
+    except (ValueError, TypeError):
+        return jsonify({"error": "freq must be a number"}), 400
+    ok, result = update_exercise_freq(code, freq)
+    if not ok:
+        return jsonify({"error": result}), 400
+    return jsonify({"ok": True, "name": result, "freq_label": f"{freq:g}x/wk"})

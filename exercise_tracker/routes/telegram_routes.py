@@ -96,13 +96,18 @@ def telegram_webhook():
         lower = text.lower().strip()
         if lower in ("/todo", "/todo@" + TELEGRAM_BOT_TOKEN.split(":")[0] if TELEGRAM_BOT_TOKEN else ""):
             plan = compute_plan_data()
-            if not plan["todo_items"]:
-                telegram_reply(chat_id, "✅ All caught up! Nothing to do.")
-            else:
-                lines = ["📋 *To-Do*\n"]
+            lines = []
+            if plan["todo_items"]:
+                lines.append("📋 *To-Do*\n")
                 for item in plan["todo_items"]:
                     lines.append(f"  `{item['last_entry']}` — {item['name']} ({item['days_ago']}d ago, {item['freq_label']})")
-                telegram_reply(chat_id, "\n".join(lines))
+            else:
+                lines.append("✅ All caught up! Nothing to do.")
+            if plan["due_reminders"]:
+                lines.append("\n🔔 *Reminders*\n")
+                for r in plan["due_reminders"]:
+                    lines.append(f"  {r['date']} — {r['text']}")
+            telegram_reply(chat_id, "\n".join(lines))
             return jsonify({"ok": True})
 
         if lower in ("/slipping", "/slipping@" + TELEGRAM_BOT_TOKEN.split(":")[0] if TELEGRAM_BOT_TOKEN else ""):
@@ -132,6 +137,10 @@ def telegram_webhook():
                     lines.append(f"  `{item['code']}` — {item['name']} ({item['days_ago']}d, {item['freq_label']})")
             else:
                 lines.append("👍 Nothing slipping!")
+            if plan["due_reminders"]:
+                lines.append("\n🔔 *Reminders*\n")
+                for r in plan["due_reminders"]:
+                    lines.append(f"  {r['date']} — {r['text']}")
             telegram_reply(chat_id, "\n".join(lines))
             return jsonify({"ok": True})
 
@@ -301,6 +310,76 @@ def telegram_webhook():
             telegram_reply(chat_id, "\n".join(lines))
             return jsonify({"ok": True})
 
+        # /reminder YYYY M D text — add a reminder for a future date
+        if lower.startswith("/reminder "):
+            # Parse from original text to preserve casing of reminder text
+            parts = text.split(maxsplit=4)  # ['/reminder', 'YYYY', 'M', 'D', 'text...']
+            if len(parts) < 5:
+                telegram_reply(chat_id, "Usage: /reminder YYYY M D reminder text")
+                return jsonify({"ok": True})
+            try:
+                y, m, d = int(parts[1]), int(parts[2]), int(parts[3])
+                reminder_date = date(y, m, d)
+            except (ValueError, IndexError):
+                telegram_reply(chat_id, "❌ Invalid date. Usage: /reminder YYYY M D text")
+                return jsonify({"ok": True})
+            reminder_text = parts[4].strip()
+            if not reminder_text:
+                telegram_reply(chat_id, "❌ Reminder text is required")
+                return jsonify({"ok": True})
+            conn = get_db()
+            cur = conn.cursor()
+            cur.execute(
+                "INSERT INTO reminders (reminder_date, text) VALUES (%s, %s)",
+                (reminder_date.isoformat(), reminder_text),
+            )
+            telegram_reply(chat_id, f"🔔 Reminder set for {reminder_date.isoformat()}: {reminder_text}")
+            return jsonify({"ok": True})
+
+        # /reminders — list all undismissed reminders
+        if lower in ("/reminders",):
+            today = date.today()
+            conn = get_db()
+            cur = conn.cursor(cursor_factory=RealDictCursor)
+            cur.execute("""
+                SELECT id, reminder_date, text
+                FROM reminders
+                WHERE dismissed = FALSE
+                ORDER BY reminder_date, id
+            """)
+            rows = cur.fetchall()
+            if not rows:
+                telegram_reply(chat_id, "🔔 No active reminders.")
+                return jsonify({"ok": True})
+            lines = ["🔔 *Reminders*\n"]
+            for idx, r in enumerate(rows, 1):
+                is_due = r["reminder_date"] <= today
+                marker = "⚡" if is_due else "⏳"
+                lines.append(f"  {idx}. {marker} {r['reminder_date'].isoformat()} — {r['text']}")
+            lines.append("\nDismiss with: /dismiss N")
+            telegram_reply(chat_id, "\n".join(lines))
+            return jsonify({"ok": True})
+
+        # /dismiss N — dismiss reminder by display number
+        dismiss_match = re.match(r"^/dismiss\s+(\d+)$", lower)
+        if dismiss_match:
+            idx = int(dismiss_match.group(1))
+            conn = get_db()
+            cur = conn.cursor(cursor_factory=RealDictCursor)
+            cur.execute("""
+                SELECT id, text FROM reminders
+                WHERE dismissed = FALSE
+                ORDER BY reminder_date, id
+            """)
+            rows = cur.fetchall()
+            if idx < 1 or idx > len(rows):
+                telegram_reply(chat_id, f"❌ Invalid number. Use /reminders to see the list (1-{len(rows)}).")
+                return jsonify({"ok": True})
+            target = rows[idx - 1]
+            cur.execute("UPDATE reminders SET dismissed = TRUE WHERE id = %s", (target["id"],))
+            telegram_reply(chat_id, f"✅ Dismissed: {target['text']}")
+            return jsonify({"ok": True})
+
         # Default help for unknown commands
         telegram_reply(chat_id, "👋 Exercise & Weight Tracker Bot\n\n"
                        "Send a weight like: 64.4\n"
@@ -313,15 +392,42 @@ def telegram_webhook():
                        "/todo — exercises due\n"
                        "/slipping — exercises slipping\n"
                        "/plan — todo + slipping\n"
+                       "/reminder YYYY M D text — set a reminder\n"
+                       "/reminders — list reminders\n"
+                       "/dismiss N — dismiss reminder\n"
                        "\n"
                        "P /recent — last 4 sessions for P\n"
-                       "P /notes — notes for P")
+                       "P /notes — notes for P\n"
+                       "SC 2 /newf — change SC frequency to 2x/wk")
         return jsonify({"ok": True})
 
-    # Handle [code] /recent and [code] /notes
+    # Handle [code] /recent, [code] /notes, and [code] N /newf
     lower = text.lower().strip()
     recent_match = re.match(r"^(\S+)\s+/recent$", lower)
     notes_match = re.match(r"^(\S+)\s+/notes$", lower)
+    newf_match = re.match(r"^(\S+)\s+([\d.]+)\s+/newf$", lower)
+
+    # Handle frequency change: CODE N /newf
+    if newf_match:
+        code_raw = newf_match.group(1)
+        valid_codes = get_valid_codes()
+        from ..parsing import normalize_code
+        from ..db import update_exercise_freq
+        code = normalize_code(code_raw, valid_codes)
+        if code not in valid_codes:
+            telegram_reply(chat_id, f"❓ Unknown exercise code: {code_raw}")
+            return jsonify({"ok": True})
+        try:
+            new_freq = float(newf_match.group(2))
+        except ValueError:
+            telegram_reply(chat_id, "❌ Invalid frequency number")
+            return jsonify({"ok": True})
+        ok, result = update_exercise_freq(code, new_freq)
+        if ok:
+            telegram_reply(chat_id, f"✅ {code} ({result}) frequency updated to {new_freq:g}x/wk")
+        else:
+            telegram_reply(chat_id, f"❌ {result}")
+        return jsonify({"ok": True})
 
     if recent_match:
         code_raw = recent_match.group(1)

@@ -55,6 +55,46 @@ def close_db(e=None):
             db.close()
 
 
+def update_exercise_freq(code, new_freq):
+    """Update target frequency for an exercise in both DB and exercises.txt.
+
+    Args:
+        code: Exercise code (e.g. 'SC')
+        new_freq: New frequency as float (0 < freq <= 7)
+
+    Returns:
+        (True, name) on success, (False, error_message) on failure.
+    """
+    if new_freq <= 0 or new_freq > 7:
+        return False, "Frequency must be between 0 and 7"
+
+    # Format freq for display: use int if whole number, else minimal decimal
+    freq_str = f"{new_freq:g}"
+
+    # Update exercises.txt — match the exact code line and replace <N>
+    lines = EXERCISES_FILE.read_text().splitlines()
+    updated = False
+    for i, line in enumerate(lines):
+        m = re.match(r"^(" + re.escape(code) + r"\s*=\s*.+?)\s*<[\d.]+>\s*$", line)
+        if m:
+            lines[i] = f"{m.group(1)} <{freq_str}>"
+            updated = True
+            break
+    if not updated:
+        return False, f"Code {code} not found in exercises.txt"
+
+    # Write file, then update DB
+    EXERCISES_FILE.write_text("\n".join(lines) + "\n")
+
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("UPDATE exercises SET target_freq = %s WHERE code = %s", (new_freq, code))
+    cur.execute("SELECT name FROM exercises WHERE code = %s", (code,))
+    row = cur.fetchone()
+    name = row[0] if row else code
+    return True, name
+
+
 def parse_exercises_file():
     """Parse data/exercises.txt into a list of exercise tuples.
 
@@ -197,6 +237,16 @@ def init_db():
             cur.execute("UPDATE entries SET exercise_code = 'SP' WHERE exercise_code = 'SS'")
             cur.execute("UPDATE exercise_notes SET exercise_code = 'SP' WHERE exercise_code = 'SS'")
             cur.execute("DELETE FROM exercises WHERE code = 'SS'")
+        # Migration: create reminders table for date-based reminders
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS reminders (
+                id SERIAL PRIMARY KEY,
+                reminder_date DATE NOT NULL,
+                text TEXT NOT NULL,
+                dismissed BOOLEAN DEFAULT FALSE,
+                created_at TIMESTAMPTZ DEFAULT NOW()
+            )
+        """)
         seed_exercises(cur)
         cur.close()
     finally:

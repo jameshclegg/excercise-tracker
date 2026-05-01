@@ -210,6 +210,16 @@
         {% else %}
         <p class="empty" style="font-size:0.85rem;">Nothing slipping 👍</p>
         {% endif %}
+
+        {% if due_reminders %}
+        <h3>🔔 Reminders</h3>
+        {% for r in due_reminders %}
+        <div class="plan-item" style="display:flex; justify-content:space-between; align-items:center;" id="reminder-{{ r.id }}">
+            <span style="color:#f39c12;">{{ r.text }} <span style="color:#888; font-size:0.75rem;">({{ r.date }})</span></span>
+            <button style="background:none; border:none; color:#f44; cursor:pointer; font-size:1rem; padding:0 4px;" aria-label="Dismiss reminder" data-reminder-id="{{ r.id }}">✕</button>
+        </div>
+        {% endfor %}
+        {% endif %}
     </div>
 
     </div> <!-- end entries-plan-row -->
@@ -230,6 +240,36 @@
             <button id="historyToggle" style="display:none; padding:6px 14px; background:#16213e; color:#00d4ff; border:1px solid #00d4ff; border-radius:4px; cursor:pointer; font-size:0.85rem;">Full</button>
         </div>
         <div id="recentResults" style="margin-top:10px;"></div>
+    </div>
+
+    <!-- Reminders & Frequency row -->
+    <div style="display:flex; gap:1.5rem; margin:1.5rem auto; max-width:900px; flex-wrap:wrap;">
+        <!-- Reminders card -->
+        <div class="card" style="flex:1; min-width:300px; padding:1rem 1.5rem;">
+            <h2>🔔 Reminders</h2>
+            <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:10px;">
+                <input type="date" id="reminderDate" aria-label="Reminder date"
+                       style="padding:6px; background:#1a1a2e; color:#eee; border:1px solid #333; border-radius:4px;">
+                <input type="text" id="reminderText" placeholder="Reminder text…" aria-label="Reminder text"
+                       style="padding:6px; background:#1a1a2e; color:#eee; border:1px solid #333; border-radius:4px; flex:1; min-width:180px;">
+                <button id="reminderAddBtn" style="padding:6px 14px; background:#00d4ff; color:#1a1a2e; border:none; border-radius:4px; cursor:pointer; font-weight:600;">Add</button>
+            </div>
+            <div id="remindersList" style="max-height:250px; overflow-y:auto;"></div>
+        </div>
+
+        <!-- Frequency change card -->
+        <div class="card" style="flex:0 0 280px; padding:1rem 1.5rem;">
+            <h2>⚡ Change Frequency</h2>
+            <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+                <input type="text" id="freqCode" list="exerciseList" placeholder="Code" aria-label="Exercise code"
+                       style="padding:6px; background:#1a1a2e; color:#eee; border:1px solid #333; border-radius:4px; width:80px;">
+                <input type="number" id="freqValue" placeholder="Freq" aria-label="Frequency per week" step="0.5" min="0.5" max="7"
+                       style="padding:6px; background:#1a1a2e; color:#eee; border:1px solid #333; border-radius:4px; width:70px;">
+                <span style="color:#888; font-size:0.85rem;">x/wk</span>
+                <button id="freqUpdateBtn" style="padding:6px 14px; background:#00d4ff; color:#1a1a2e; border:none; border-radius:4px; cursor:pointer; font-weight:600;">Update</button>
+            </div>
+            <div id="freqStatus" style="margin-top:8px; font-size:0.85rem;"></div>
+        </div>
     </div>
     <script>
         function collapseSets(s) {
@@ -644,6 +684,86 @@
             }
         }
 
+        /* --- Reminders --- */
+        async function loadReminders() {
+            const container = document.getElementById('remindersList');
+            try {
+                const resp = await fetch('/api/reminders');
+                const data = await resp.json();
+                if (data.length === 0) {
+                    container.innerHTML = '<p style="color:#888; font-size:0.85rem;">No reminders</p>';
+                    return;
+                }
+                let html = '';
+                const today = new Date().toISOString().slice(0, 10);
+                data.forEach(r => {
+                    const isDue = r.date <= today;
+                    const color = isDue ? '#f39c12' : '#888';
+                    const label = isDue ? '(due)' : '(upcoming)';
+                    html += '<div style="display:flex; justify-content:space-between; align-items:center; padding:4px 0; border-bottom:1px solid #222;" id="rem-' + r.id + '">';
+                    html += '<span style="color:' + color + '; font-size:0.85rem;">' + escapeHtml(r.date) + ' ' + label + ' — ' + escapeHtml(r.text) + '</span>';
+                    html += '<button style="background:none; border:none; color:#f44; cursor:pointer; font-size:1rem; padding:0 4px;" data-dismiss-id="' + r.id + '">\u2715</button>';
+                    html += '</div>';
+                });
+                container.innerHTML = html;
+                /* Attach dismiss handlers */
+                container.querySelectorAll('[data-dismiss-id]').forEach(btn => {
+                    btn.addEventListener('click', async function() {
+                        const id = this.getAttribute('data-dismiss-id');
+                        await fetch('/api/reminder/' + id + '/dismiss', { method: 'POST' });
+                        loadReminders();
+                    });
+                });
+            } catch(e) {
+                container.innerHTML = '<p style="color:#f44;">Error loading reminders</p>';
+            }
+        }
+
+        async function addReminder() {
+            const dateInput = document.getElementById('reminderDate');
+            const textInput = document.getElementById('reminderText');
+            if (!dateInput.value || !textInput.value.trim()) return;
+            try {
+                const resp = await fetch('/api/reminder', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ date: dateInput.value, text: textInput.value.trim() })
+                });
+                if (resp.ok) {
+                    textInput.value = '';
+                    loadReminders();
+                }
+            } catch(e) { /* ignore */ }
+        }
+
+        async function changeFreq() {
+            const codeInput = document.getElementById('freqCode');
+            const freqInput = document.getElementById('freqValue');
+            const status = document.getElementById('freqStatus');
+            if (!codeInput.value || !freqInput.value) return;
+            try {
+                const resp = await fetch('/api/freq', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ code: codeInput.value.trim(), freq: parseFloat(freqInput.value) })
+                });
+                const data = await resp.json();
+                if (resp.ok) {
+                    status.textContent = '\u2713 ' + data.name + ' updated to ' + data.freq_label;
+                    status.style.color = '#0f0';
+                    codeInput.value = '';
+                    freqInput.value = '';
+                } else {
+                    status.textContent = data.error || 'Error';
+                    status.style.color = '#f44';
+                }
+                setTimeout(() => { status.textContent = ''; }, 3000);
+            } catch(e) {
+                status.textContent = 'Error updating';
+                status.style.color = '#f44';
+            }
+        }
+
         // Event listeners (replacing inline handlers)
         document.addEventListener('DOMContentLoaded', function() {
             var dateInput = document.getElementById('dateInput');
@@ -677,6 +797,31 @@
             document.querySelectorAll('.delete-form').forEach(function(form) {
                 form.addEventListener('submit', function(e) {
                     if (!confirm('Delete?')) e.preventDefault();
+                });
+            });
+
+            /* Reminder card: add button and load list */
+            var reminderAddBtn = document.getElementById('reminderAddBtn');
+            if (reminderAddBtn) reminderAddBtn.addEventListener('click', addReminder);
+            var reminderText = document.getElementById('reminderText');
+            if (reminderText) {
+                reminderText.addEventListener('keydown', function(e) {
+                    if (e.key === 'Enter') { addReminder(); e.preventDefault(); }
+                });
+            }
+            loadReminders();
+
+            /* Frequency change button */
+            var freqUpdateBtn = document.getElementById('freqUpdateBtn');
+            if (freqUpdateBtn) freqUpdateBtn.addEventListener('click', changeFreq);
+
+            /* Plan panel: dismiss buttons for due reminders */
+            document.querySelectorAll('[data-reminder-id]').forEach(function(btn) {
+                btn.addEventListener('click', async function() {
+                    var id = this.getAttribute('data-reminder-id');
+                    await fetch('/api/reminder/' + id + '/dismiss', { method: 'POST' });
+                    document.getElementById('reminder-' + id).remove();
+                    loadReminders();
                 });
             });
         });
