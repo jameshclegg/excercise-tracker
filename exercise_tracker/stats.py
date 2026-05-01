@@ -101,13 +101,13 @@ def compute_stats_data():
     category_dist = {r["category"]: r["count"] for r in cur.fetchall()}
 
     cur.execute("""
-        SELECT e.exercise_code, ex.name, ex.category, ex.input_type,
+        SELECT e.exercise_code, ex.name, ex.category, ex.input_type, ex.target_freq,
                COUNT(*) as total_count,
                MAX(e.date) as last_done,
                MIN(e.date) as first_done
         FROM entries e
         JOIN exercises ex ON e.exercise_code = ex.code
-        GROUP BY e.exercise_code, ex.name, ex.category, ex.input_type
+        GROUP BY e.exercise_code, ex.name, ex.category, ex.input_type, ex.target_freq
         ORDER BY MAX(e.date) DESC
     """)
     exercise_stats_raw = cur.fetchall()
@@ -179,6 +179,7 @@ def compute_stats_data():
     for r in exercise_stats_raw:
         code = r["exercise_code"]
         days_since = (today - r["last_done"]).days
+        freq = float(r["target_freq"]) if r["target_freq"] else 1
         exercise_stats.append({
             "code": code,
             "name": r["name"],
@@ -187,6 +188,7 @@ def compute_stats_data():
             "total_count": r["total_count"],
             "last_done": r["last_done"].isoformat(),
             "days_since": days_since,
+            "freq_label": f"{freq:g}x/wk",
         })
 
     # Sort exercises by most recently done first

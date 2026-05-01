@@ -517,6 +517,7 @@
                         <tr>
                             <th>Exercise</th>
                             <th>Category</th>
+                            <th>Freq</th>
                             <th>Total</th>
                             <th>Last Done</th>
                             <th>Days Ago</th>
@@ -527,6 +528,7 @@
                         <tr>
                             <td><strong>{{ s.code }}</strong> — {{ s.name }}</td>
                             <td><span class="cat-badge cat-{{ s.category }}">{{ s.category }}</span></td>
+                            <td style="color:#888; font-size:0.85rem;">{{ s.freq_label }}</td>
                             <td>{{ s.total_count }}</td>
                             <td>{{ s.last_done }}</td>
                             <td>

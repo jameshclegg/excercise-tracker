@@ -9,7 +9,6 @@ A Flask web app for tracking daily exercises, deployed on Render with a Neon (Po
 | `app.py` | Main Flask web application — routes, database logic, exercise seeding |
 | `entry.py` | CLI data entry tool for quick offline exercise logging |
 | `data.txt` | Locally-entered exercise data (from `entry.py`) |
-| `exercises.txt` | Master list of 38 exercise codes with categories |
 | `templates/` | HTML templates (login, desktop index, mobile view) |
 | `generate_hash.py` | One-time script to generate a password hash |
 | `set_password.ps1` | Script to update password hash across app `.env` files |
@@ -19,15 +18,17 @@ A Flask web app for tracking daily exercises, deployed on Render with a Neon (Po
 
 ## Exercise Codes
 
-Exercises are categorised as **strength**, **isometric**, **skill**, **fitness**, or **flexibility**. Each category determines the input type:
+Exercises are categorised as **strength**, **isometric**, **skill**, **fitness**, **flexibility**, **physio**, or **music**. Each category determines the input type:
 
 - **Strength** — reps + sets
 - **Isometric** — time (sec) + sets
 - **Skill** — time (sec) + sets
 - **Fitness** — varies (distance for runs, time+sets for skipping, none for HIIT/climbing)
 - **Flexibility** — no numbers
+- **Physio** — reps + sets (or time+sets for some)
+- **Music** — duration in minutes
 
-See `exercises.txt` for the full list of codes.
+Exercise codes, categories, and frequencies are stored in the database. Use `/codes` in Telegram or view the Consistency Scores table in the web app to see the full list.
 
 ## Local Development
 
