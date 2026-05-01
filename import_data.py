@@ -26,7 +26,7 @@ import psycopg2
 load_dotenv()
 
 DATABASE_URL = os.environ["DATABASE_URL"]
-DATA_FILE = Path(__file__).resolve().parent / "data" / "data.txt"
+DATA_FILE = Path(__file__).resolve().parent / "data" / "original-input-data.txt"
 
 # Code aliases (case-insensitive matching)
 CODE_ALIASES = {
