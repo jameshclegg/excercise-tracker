@@ -6,17 +6,14 @@ from psycopg2.extras import RealDictCursor
 
 from .db import get_db
 
-# Exercises not done for 5+ weeks are considered dormant (abandoned)
-# and excluded from to-do/slipping lists to reduce noise
-DORMANT_DAYS = 35
-
 
 def compute_plan_data():
     """Compute to-do and slipping exercise lists based on target frequency.
 
-    To-do: days_since_last >= 7/freq AND days_since_last < 14
-    Slipping: days_since_last >= 14 AND days_since_last < DORMANT_DAYS
-    Dormant (>= DORMANT_DAYS): not shown
+    Thresholds scale with each exercise's interval (7/freq):
+    - To-do: days_since >= interval
+    - Slipping: days_since >= 3 * interval
+    - Dormant (>= 6 * interval): not shown
     """
     conn = get_db()
     cur = conn.cursor(cursor_factory=RealDictCursor)
@@ -47,17 +44,18 @@ def compute_plan_data():
 
         days_since = (today - last_done).days
 
-        if days_since >= DORMANT_DAYS:
-            continue  # dormant
-
         # Derive the expected interval from target frequency:
         # e.g. freq=2 means twice/week → 7/2=3.5 → floor to 3 days
-        # Floor ensures exercises appear in todo promptly rather than waiting
-        # an extra day when the interval isn't a whole number.
         interval = int(7.0 / float(freq))
+        # Slipping and dormant thresholds scale with the interval
+        slipping_threshold = interval * 3
+        dormant_threshold = interval * 6
         freq_label = f"{float(freq):g}x/wk"
 
-        if days_since >= 14:
+        if days_since >= dormant_threshold:
+            continue  # dormant
+
+        if days_since >= slipping_threshold:
             # Slipping
             slipping_items.append({
                 "code": ex["code"],
