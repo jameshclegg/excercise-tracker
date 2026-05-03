@@ -10,7 +10,7 @@ from datetime import date, timedelta
 from flask import Blueprint, jsonify, request
 from psycopg2.extras import RealDictCursor
 
-from ..config import TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID
+from ..config import TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, TELEGRAM_WEBHOOK_SECRET
 
 WEIGHT_TRACKER_URL = os.environ.get("WEIGHT_TRACKER_URL", "")
 from ..db import get_db, get_db_transaction
@@ -66,6 +66,13 @@ def telegram_webhook():
     if not TELEGRAM_BOT_TOKEN:
         return jsonify({"ok": False, "error": "Bot not configured"}), 500
 
+    # If a webhook secret is configured, require it on every request.
+    # Telegram sends it in the X-Telegram-Bot-Api-Secret-Token header.
+    if TELEGRAM_WEBHOOK_SECRET:
+        provided = request.headers.get("X-Telegram-Bot-Api-Secret-Token", "")
+        if provided != TELEGRAM_WEBHOOK_SECRET:
+            return jsonify({"ok": False}), 403
+
     data = request.get_json(silent=True)
     if not data or "message" not in data:
         return jsonify({"ok": True})
@@ -94,7 +101,7 @@ def telegram_webhook():
     # Handle bot commands (slash-prefixed)
     if text.startswith("/"):
         lower = text.lower().strip()
-        if lower in ("/todo", "/todo@" + TELEGRAM_BOT_TOKEN.split(":")[0] if TELEGRAM_BOT_TOKEN else ""):
+        if lower in ("/todo",):
             plan = compute_plan_data()
             lines = []
             if plan["todo_items"]:
@@ -110,7 +117,7 @@ def telegram_webhook():
             telegram_reply(chat_id, "\n".join(lines))
             return jsonify({"ok": True})
 
-        if lower in ("/slipping", "/slipping@" + TELEGRAM_BOT_TOKEN.split(":")[0] if TELEGRAM_BOT_TOKEN else ""):
+        if lower in ("/slipping",):
             plan = compute_plan_data()
             if not plan["slipping_items"]:
                 telegram_reply(chat_id, "👍 Nothing slipping!")
@@ -436,6 +443,10 @@ def telegram_webhook():
             except (ValueError, IndexError):
                 telegram_reply(chat_id, "❌ Invalid date. Usage: /reminder YYYY M D text")
                 return jsonify({"ok": True})
+            today = date.today()
+            if abs((reminder_date - today).days) > 3650:
+                telegram_reply(chat_id, "❌ Date must be within 10 years of today")
+                return jsonify({"ok": True})
             reminder_text = parts[4].strip()
             if not reminder_text:
                 telegram_reply(chat_id, "❌ Reminder text is required")
@@ -542,11 +553,8 @@ def telegram_webhook():
                     "ON CONFLICT (date) DO UPDATE SET weight = EXCLUDED.weight",
                     (today_str, weight),
                 )
-            # In test mode, rollback the transaction so nothing is persisted
                 if test_mode:
                     conn.rollback()
-                else:
-                    conn.commit()
             telegram_reply(chat_id, f"⚖️ Understood {weight} as weight {weight} kg.\n"
                            f"Posted to weight tracker for {today_str}.{test_label}")
             # Ping the weight tracker app to wake it from cold start
@@ -556,7 +564,8 @@ def telegram_webhook():
                 except Exception:
                     pass  # best-effort, don't fail the response
         except Exception as e:
-            telegram_reply(chat_id, f"❌ Error saving weight: {e}")
+            print(f"Error saving weight: {e}")
+            telegram_reply(chat_id, "❌ Error saving weight (check server logs)")
         return jsonify({"ok": True})
 
     # Fall through: try parsing as exercise entries (e.g. 'p -13 5 4, a 1')
@@ -601,13 +610,12 @@ def telegram_webhook():
 
             if test_mode:
                 conn.rollback()
-            else:
-                conn.commit()
 
         reply = f"🏋️ Posted {len(parsed)} exercise(s) for {today_str}:{test_label}\n"
         reply += "\n".join(f"  • {s}" for s in summaries)
         telegram_reply(chat_id, reply)
     except Exception as e:
-        telegram_reply(chat_id, f"❌ Error saving exercises: {e}")
+        print(f"Error saving exercises: {e}")
+        telegram_reply(chat_id, "❌ Error saving exercises (check server logs)")
 
     return jsonify({"ok": True})

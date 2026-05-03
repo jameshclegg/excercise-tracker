@@ -27,11 +27,16 @@ def get_db():
 
 @contextmanager
 def get_db_transaction():
-    """Context manager for transaction blocks. Creates a separate connection with rollback on error."""
+    """Context manager for transaction blocks: auto-commits on success, rolls back on error.
+
+    Callers may explicitly call conn.rollback() inside the block (e.g. test mode);
+    the subsequent auto-commit is then a no-op on the empty transaction.
+    """
     conn = psycopg2.connect(DATABASE_URL)
     conn.autocommit = False
     try:
         yield conn
+        conn.commit()
     except Exception:
         conn.rollback()
         raise

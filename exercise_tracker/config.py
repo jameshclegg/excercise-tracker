@@ -15,6 +15,9 @@ if not SECRET_KEY:
 
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "")
+# Optional shared secret. When set, must be configured on the Telegram webhook
+# (setWebhook?secret_token=...) and is verified via X-Telegram-Bot-Api-Secret-Token.
+TELEGRAM_WEBHOOK_SECRET = os.environ.get("TELEGRAM_WEBHOOK_SECRET", "")
 
 # Input type determines which fields are shown in the UI
 INPUT_TYPES = {

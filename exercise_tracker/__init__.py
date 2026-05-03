@@ -1,5 +1,7 @@
 """Exercise Tracker — Flask application package."""
 
+import os
+
 from flask import Flask
 from dotenv import load_dotenv
 
@@ -21,6 +23,15 @@ def create_app():
         static_folder="../static",
     )
     app.secret_key = SECRET_KEY
+
+    # Session cookie hardening — SameSite=Lax mitigates CSRF on cookie-authed
+    # POST routes by blocking cross-site form submissions. Secure flag forces
+    # HTTPS-only in production (debug allows local HTTP).
+    app.config.update(
+        SESSION_COOKIE_HTTPONLY=True,
+        SESSION_COOKIE_SAMESITE="Lax",
+        SESSION_COOKIE_SECURE=not bool(os.environ.get("FLASK_DEBUG")),
+    )
 
     @app.template_filter("collapse_sets")
     def collapse_sets_filter(sets_str):

@@ -194,6 +194,9 @@ def add_reminder():
         reminder_date = date.fromisoformat(data["date"])
     except ValueError:
         return jsonify({"error": "invalid date format"}), 400
+    today = date.today()
+    if abs((reminder_date - today).days) > 3650:
+        return jsonify({"error": "date must be within 10 years of today"}), 400
     conn = get_db()
     cur = conn.cursor()
     cur.execute(
