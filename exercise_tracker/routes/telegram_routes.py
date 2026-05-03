@@ -58,7 +58,7 @@ def telegram_webhook():
 
     Supports:
     - Bot commands: /today, /recent, /plan, /todo, /slipping, /codes, /recentw
-    - Per-exercise queries: 'P /recent', 'P /notes'
+    - Per-exercise queries: '/recent CODE', '/notes CODE', '/newf CODE FREQ'
     - Weight logging: a decimal like '74.5' is saved as today's weight
     - Exercise logging: parsed via parse_bulk_entry (e.g. 'p -13 5 4, a 1')
     - Test mode: append '/test' to preview without saving
@@ -181,7 +181,70 @@ def telegram_webhook():
                 telegram_reply(chat_id, "\n".join(lines))
             return jsonify({"ok": True})
 
-        if lower.startswith("/recent") and not lower.startswith("/recentw"):
+        # Parse slash command: first token is the command, rest are arguments
+        cmd_parts = text.split()
+        cmd_word = cmd_parts[0].lower()
+        cmd_args = cmd_parts[1:]
+
+        if cmd_word == "/recent":
+            if cmd_args:
+                # /recent CODE — per-exercise history
+                code_raw = cmd_args[0]
+                valid_codes = get_valid_codes()
+                from ..parsing import normalize_code
+                code = normalize_code(code_raw, valid_codes)
+                if code not in valid_codes:
+                    telegram_reply(chat_id, f"❓ Unknown exercise code: {code_raw}")
+                    return jsonify({"ok": True})
+
+                today = date.today()
+                conn = get_db()
+                cur = conn.cursor(cursor_factory=RealDictCursor)
+                cur.execute(
+                    """
+                    SELECT e.date, e.sets, e.weight, ex.name
+                    FROM entries e
+                    JOIN exercises ex ON e.exercise_code = ex.code
+                    WHERE e.exercise_code = %s
+                    ORDER BY e.date DESC, e.id DESC
+                    LIMIT 20
+                    """,
+                    (code,),
+                )
+                rows = cur.fetchall()
+
+                if not rows:
+                    telegram_reply(chat_id, f"No history for {code}.")
+                    return jsonify({"ok": True})
+
+                # Group by date, take last 4 dates
+                from collections import OrderedDict
+                by_date = OrderedDict()
+                for r in rows:
+                    d = r["date"]
+                    if d not in by_date:
+                        if len(by_date) >= 4:
+                            break
+                        by_date[d] = []
+                    by_date[d].append(r)
+
+                name = rows[0]["name"]
+                lines = [f"📊 {code} — {name}\n"]
+                for d, entries in by_date.items():
+                    days_ago = (today - d).days
+                    day_label = "today" if days_ago == 0 else f"{days_ago}d ago"
+                    for e in entries:
+                        parts = []
+                        if e["sets"]:
+                            parts.append(_collapse_sets(e["sets"]))
+                        if e["weight"]:
+                            parts.append(f"@ {e['weight']}kg")
+                        detail = " ".join(parts) if parts else "✓"
+                        lines.append(f"  {day_label}: {detail}")
+                telegram_reply(chat_id, "\n".join(lines))
+                return jsonify({"ok": True})
+
+            # /recent with no args — global last 7 days view
             today = date.today()
             conn = get_db()
             cur = conn.cursor(cursor_factory=RealDictCursor)
@@ -245,7 +308,57 @@ def telegram_webhook():
             telegram_reply(chat_id, "\n".join(lines))
             return jsonify({"ok": True})
 
-        if lower.startswith("/recentw"):
+        if cmd_word == "/notes":
+            if not cmd_args:
+                telegram_reply(chat_id, "Usage: /notes CODE")
+                return jsonify({"ok": True})
+            code_raw = cmd_args[0]
+            valid_codes = get_valid_codes()
+            from ..parsing import normalize_code
+            code = normalize_code(code_raw, valid_codes)
+            if code not in valid_codes:
+                telegram_reply(chat_id, f"❓ Unknown exercise code: {code_raw}")
+                return jsonify({"ok": True})
+
+            conn = get_db()
+            cur = conn.cursor(cursor_factory=RealDictCursor)
+            cur.execute("SELECT ex.name FROM exercises ex WHERE ex.code = %s", (code,))
+            ex = cur.fetchone()
+            cur.execute("SELECT notes FROM exercise_notes WHERE exercise_code = %s", (code,))
+            row = cur.fetchone()
+
+            name = ex["name"] if ex else code
+            if row and row["notes"].strip():
+                telegram_reply(chat_id, f"📝 {code} — {name}\n\n{row['notes']}")
+            else:
+                telegram_reply(chat_id, f"📝 {code} — {name}\n\nNo notes.")
+            return jsonify({"ok": True})
+
+        if cmd_word == "/newf":
+            if len(cmd_args) < 2:
+                telegram_reply(chat_id, "Usage: /newf CODE FREQ")
+                return jsonify({"ok": True})
+            code_raw = cmd_args[0]
+            valid_codes = get_valid_codes()
+            from ..parsing import normalize_code
+            from ..db import update_exercise_freq
+            code = normalize_code(code_raw, valid_codes)
+            if code not in valid_codes:
+                telegram_reply(chat_id, f"❓ Unknown exercise code: {code_raw}")
+                return jsonify({"ok": True})
+            try:
+                new_freq = float(cmd_args[1])
+            except ValueError:
+                telegram_reply(chat_id, "❌ Invalid frequency number")
+                return jsonify({"ok": True})
+            ok, result = update_exercise_freq(code, new_freq)
+            if ok:
+                telegram_reply(chat_id, f"✅ {code} ({result}) frequency updated to {new_freq:g}x/wk")
+            else:
+                telegram_reply(chat_id, f"❌ {result}")
+            return jsonify({"ok": True})
+
+        if cmd_word == "/recentw":
             today = date.today()
             conn = get_db()
             cur = conn.cursor(cursor_factory=RealDictCursor)
@@ -283,7 +396,7 @@ def telegram_webhook():
                 telegram_reply(chat_id, "\n".join(lines))
             return jsonify({"ok": True})
 
-        if lower.startswith("/codes"):
+        if cmd_word == "/codes":
             today = date.today()
             conn = get_db()
             cur = conn.cursor(cursor_factory=RealDictCursor)
@@ -381,131 +494,24 @@ def telegram_webhook():
             return jsonify({"ok": True})
 
         # Default help for unknown commands
-        telegram_reply(chat_id, "👋 Exercise & Weight Tracker Bot\n\n"
+        telegram_reply(chat_id, "❓ Unknown command.\n\n"
+                       "👋 Exercise & Weight Tracker Bot\n\n"
                        "Send a weight like: 64.4\n"
                        "Or exercises like: p -13 5 4, a 1, vb\n\n"
                        "Commands:\n"
                        "/today — what you did today\n"
-                       "/recent — last 7 days by date & exercise\n"
+                       "/recent — last 7 days\n"
+                       "/recent CODE — history for exercise\n"
                        "/recentw — weight last 7 days\n"
                        "/codes — all exercise codes\n"
                        "/todo — exercises due\n"
                        "/slipping — exercises slipping\n"
                        "/plan — todo + slipping\n"
+                       "/notes CODE — notes for exercise\n"
+                       "/newf CODE FREQ — change frequency\n"
                        "/reminder YYYY M D text — set a reminder\n"
                        "/reminders — list reminders\n"
-                       "/dismiss N — dismiss reminder\n"
-                       "\n"
-                       "P /recent — last 4 sessions for P\n"
-                       "P /notes — notes for P\n"
-                       "SC 2 /newf — change SC frequency to 2x/wk")
-        return jsonify({"ok": True})
-
-    # Handle [code] /recent, [code] /notes, and [code] N /newf
-    lower = text.lower().strip()
-    recent_match = re.match(r"^(\S+)\s+/recent$", lower)
-    notes_match = re.match(r"^(\S+)\s+/notes$", lower)
-    newf_match = re.match(r"^(\S+)\s+([\d.]+)\s+/newf$", lower)
-
-    # Handle frequency change: CODE N /newf
-    if newf_match:
-        code_raw = newf_match.group(1)
-        valid_codes = get_valid_codes()
-        from ..parsing import normalize_code
-        from ..db import update_exercise_freq
-        code = normalize_code(code_raw, valid_codes)
-        if code not in valid_codes:
-            telegram_reply(chat_id, f"❓ Unknown exercise code: {code_raw}")
-            return jsonify({"ok": True})
-        try:
-            new_freq = float(newf_match.group(2))
-        except ValueError:
-            telegram_reply(chat_id, "❌ Invalid frequency number")
-            return jsonify({"ok": True})
-        ok, result = update_exercise_freq(code, new_freq)
-        if ok:
-            telegram_reply(chat_id, f"✅ {code} ({result}) frequency updated to {new_freq:g}x/wk")
-        else:
-            telegram_reply(chat_id, f"❌ {result}")
-        return jsonify({"ok": True})
-
-    if recent_match:
-        code_raw = recent_match.group(1)
-        valid_codes = get_valid_codes()
-        from ..parsing import normalize_code
-        code = normalize_code(code_raw, valid_codes)
-        if code not in valid_codes:
-            telegram_reply(chat_id, f"❓ Unknown exercise code: {code_raw}")
-            return jsonify({"ok": True})
-
-        today = date.today()
-        conn = get_db()
-        cur = conn.cursor(cursor_factory=RealDictCursor)
-        cur.execute(
-            """
-            SELECT e.date, e.sets, e.weight, ex.name
-            FROM entries e
-            JOIN exercises ex ON e.exercise_code = ex.code
-            WHERE e.exercise_code = %s
-            ORDER BY e.date DESC, e.id DESC
-            LIMIT 20
-            """,
-            (code,),
-        )
-        rows = cur.fetchall()
-
-        if not rows:
-            telegram_reply(chat_id, f"No history for {code}.")
-            return jsonify({"ok": True})
-
-        # Group by date, take last 4 dates
-        from collections import OrderedDict
-        by_date = OrderedDict()
-        for r in rows:
-            d = r["date"]
-            if d not in by_date:
-                if len(by_date) >= 4:
-                    break
-                by_date[d] = []
-            by_date[d].append(r)
-
-        name = rows[0]["name"]
-        lines = [f"📊 {code} — {name}\n"]
-        for d, entries in by_date.items():
-            days_ago = (today - d).days
-            day_label = "today" if days_ago == 0 else f"{days_ago}d ago"
-            for e in entries:
-                parts = []
-                if e["sets"]:
-                    parts.append(_collapse_sets(e["sets"]))
-                if e["weight"]:
-                    parts.append(f"@ {e['weight']}kg")
-                detail = " ".join(parts) if parts else "✓"
-                lines.append(f"  {day_label}: {detail}")
-        telegram_reply(chat_id, "\n".join(lines))
-        return jsonify({"ok": True})
-
-    if notes_match:
-        code_raw = notes_match.group(1)
-        valid_codes = get_valid_codes()
-        from ..parsing import normalize_code
-        code = normalize_code(code_raw, valid_codes)
-        if code not in valid_codes:
-            telegram_reply(chat_id, f"❓ Unknown exercise code: {code_raw}")
-            return jsonify({"ok": True})
-
-        conn = get_db()
-        cur = conn.cursor(cursor_factory=RealDictCursor)
-        cur.execute("SELECT ex.name FROM exercises ex WHERE ex.code = %s", (code,))
-        ex = cur.fetchone()
-        cur.execute("SELECT notes FROM exercise_notes WHERE exercise_code = %s", (code,))
-        row = cur.fetchone()
-
-        name = ex["name"] if ex else code
-        if row and row["notes"].strip():
-            telegram_reply(chat_id, f"📝 {code} — {name}\n\n{row['notes']}")
-        else:
-            telegram_reply(chat_id, f"📝 {code} — {name}\n\nNo notes.")
+                       "/dismiss N — dismiss reminder")
         return jsonify({"ok": True})
 
     # Check for '/test' suffix — allows previewing what would be saved
@@ -514,6 +520,13 @@ def telegram_webhook():
     if text.lower().endswith("/test"):
         test_mode = True
         text = text[: -len("/test")].strip()
+
+    # Reject stray slash-commands in exercise input (e.g. 'gx 2 /changefw')
+    for token in text.split():
+        if token.startswith("/") and not re.match(r"^/\d+$", token):
+            telegram_reply(chat_id, f"❌ Unrecognized command in input: {token}\n\n"
+                           "Use /recent CODE, /notes CODE, or /newf CODE FREQ")
+            return jsonify({"ok": True})
 
     today_str = date.today().isoformat()
     test_label = " [TEST MODE — not saved]" if test_mode else ""
@@ -549,7 +562,11 @@ def telegram_webhook():
     # Fall through: try parsing as exercise entries (e.g. 'p -13 5 4, a 1')
     try:
         valid_codes = get_valid_codes()
-        parsed = parse_bulk_entry(text, valid_codes)
+        try:
+            parsed = parse_bulk_entry(text, valid_codes)
+        except ValueError as e:
+            telegram_reply(chat_id, f"❌ Parse error: {e}")
+            return jsonify({"ok": True})
         if not parsed:
             telegram_reply(chat_id, "❓ I don't understand your input.\n\n"
                            "Send a weight like: 64.4\n"

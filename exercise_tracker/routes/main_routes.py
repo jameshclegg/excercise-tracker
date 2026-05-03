@@ -131,7 +131,11 @@ def add_entry():
         errors = []
         count = 0
         for raw in raw_entries:
-            parsed = parse_bulk_entry(raw, valid_codes)
+            try:
+                parsed = parse_bulk_entry(raw, valid_codes)
+            except ValueError as e:
+                errors.append(str(e))
+                continue
             for code, sets_str, weight, notes in parsed:
                 if code not in valid_codes:
                     errors.append(f"Unknown code: {code}")

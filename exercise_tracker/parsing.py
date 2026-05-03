@@ -145,6 +145,21 @@ def parse_bulk_entry(raw_entry, valid_codes):
             else:
                 break
 
+        # Reject leftover unparsed tokens (e.g. 'Ti 6 5 4 rr')
+        if idx < len(rest):
+            raise ValueError(
+                f"Unexpected token(s) after '{code_raw}': {' '.join(rest[idx:])}"
+            )
+
+        # Reject 3+ bare numbers with no plus notation (e.g. 'Ti 6 5 4')
+        if (len(set_parts) > 2
+                and all(s.isdigit() for s in set_parts)
+                and not any("+" in s for s in set_parts)):
+            raise ValueError(
+                f"Too many numbers for '{code_raw}': {' '.join(set_parts)} "
+                f"(expected at most REPS COUNT)"
+            )
+
         # Convert collected set_parts into the canonical plus notation:
         # - Single plus-notation token kept as-is ('15+12+10')
         # - Two bare numbers become reps × count ('15 3' → '15+15+15')
